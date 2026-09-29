@@ -6,6 +6,7 @@ import {
   sleepComponentMissingWhy,
   sleepNullReason,
   strainNullReason,
+  unsupportedNote,
 } from "@/lib/dashboard/explain";
 import { deviceName, formatClock, formatClockMinutes, formatDuration, formatHm, joinList } from "@/lib/dashboard/format";
 import { hourPoints, statViews } from "@/lib/dashboard/overview-view";
@@ -31,6 +32,7 @@ function recovery(p: Partial<RecoveryResult>): RecoveryResult {
     expected: ["rhr", "resp", "sleep"],
     contributors: [],
     missing: [],
+    unsupported: [],
     ...p,
   };
 }
@@ -114,6 +116,22 @@ describe("null-score reasons", () => {
     expect(sleepNullReason(null, { isToday: false })).toBe("NO SLEEP DATA");
     expect(strainNullReason(null, { isToday: true })).toBe("SYNC TO SEE");
     expect(strainNullReason(null, { isToday: false })).toBe("NO DATA");
+  });
+});
+
+describe("unsupportedNote", () => {
+  it("is a calm neutral line when nothing normal is missing", () => {
+    const rec = recovery({ unsupported: ["hrv"], contributors: [contributor("rhr"), contributor("resp"), contributor("sleep")] });
+    expect(unsupportedNote(rec, "Fitbit")).toBe("HRV isn't shared by your Fitbit — recovery uses resting HR, breathing rate and sleep.");
+    const zepp = recovery({ unsupported: ["hrv", "resp"], contributors: [contributor("rhr"), contributor("sleep")] });
+    expect(unsupportedNote(zepp, "tracker")).toBe("HRV and breathing rate aren't shared by your tracker — recovery uses resting HR and sleep.");
+  });
+
+  it("null when limited, nothing unsupported, or no score", () => {
+    expect(unsupportedNote(recovery({ unsupported: ["hrv"], limited: true }), "Fitbit")).toBeNull();
+    expect(unsupportedNote(recovery({}), "Fitbit")).toBeNull();
+    expect(unsupportedNote(recovery({ unsupported: ["hrv"], recovery: null }), "Fitbit")).toBeNull();
+    expect(unsupportedNote(null, "Fitbit")).toBeNull();
   });
 });
 

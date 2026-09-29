@@ -47,7 +47,7 @@ describe("device profiles over a month of demo data", () => {
     }
   });
 
-  it("Fitbit: staged sleep without in-bed samples (no efficiency), recovery limited (no HRV)", () => {
+  it("Fitbit: staged sleep without in-bed samples (no efficiency), recovery not limited (HRV unsupported)", () => {
     const days = lastMonth("fitbit");
     const sleeps = days.filter((d) => d.sleep.score !== null);
     expect(sleeps.length).toBeGreaterThan(24);
@@ -58,9 +58,13 @@ describe("device profiles over a month of demo data", () => {
     const rec = days.filter((d) => d.recovery.recovery !== null);
     expect(rec.length).toBeGreaterThan(25);
     for (const d of rec) {
-      expect(d.recovery.limited).toBe(true);
+      // Limited only on the rare morning an input the user normally has (resp, sleep) is missing.
+      const complete = ["rhr", "resp", "sleep"].every((k) => d.recovery.contributors.some((c) => c.key === k));
+      expect(d.recovery.limited).toBe(!complete);
+      expect(d.recovery.unsupported).toEqual(["hrv"]);
       expect(d.recovery.missing).toContain("hrv");
     }
+    expect(rec.filter((d) => !d.recovery.limited).length).toBeGreaterThan(22);
     expect(rec.some((d) => d.recovery.contributors.some((c) => c.key === "resp"))).toBe(true);
   });
 
@@ -75,9 +79,12 @@ describe("device profiles over a month of demo data", () => {
     const rec = days.filter((d) => d.recovery.recovery !== null);
     expect(rec.length).toBeGreaterThan(22);
     for (const d of rec) {
-      expect(d.recovery.limited).toBe(true);
+      const complete = ["rhr", "sleep"].every((k) => d.recovery.contributors.some((c) => c.key === k));
+      expect(d.recovery.limited).toBe(!complete);
+      expect(d.recovery.unsupported).toEqual(["hrv", "resp"]);
       expect(d.recovery.contributors.map((c) => c.key).every((k) => k === "rhr" || k === "sleep")).toBe(true);
     }
+    expect(rec.filter((d) => !d.recovery.limited).length).toBeGreaterThan(18);
   });
 
   it("iPhone only: no sleep score (in bed only), no recovery, strain from activity", () => {

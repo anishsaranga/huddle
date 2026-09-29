@@ -115,9 +115,10 @@ describe("scoreRecovery by device profile", () => {
     expect(r.recovery!).toBeGreaterThan(15);
   });
 
-  it("Fitbit (no HRV): limited, weights 45/40/15", () => {
+  it("Fitbit (no HRV): not limited (HRV is unsupported), weights 45/40/15", () => {
     const r = scoreRecovery(today({ rhr: 55, resp: 14.6, sleep: 85 }), { ...watchHistory, hrv: [] });
-    expect(r.limited).toBe(true);
+    expect(r.limited).toBe(false);
+    expect(r.unsupported).toEqual(["hrv"]);
     expect(r.missing).toEqual(["hrv"]);
     expect(r.contributors.map((c) => [c.key, c.weight])).toEqual([
       ["rhr", 0.45],
@@ -129,15 +130,23 @@ describe("scoreRecovery by device profile", () => {
     expect(r.expected).toEqual(["rhr", "resp", "sleep"]);
   });
 
-  it("Zepp (RHR + sleep only): limited, weights rescaled", () => {
+  it("Zepp (RHR + sleep only): not limited (HRV, resp unsupported), weights rescaled", () => {
     const r = scoreRecovery(today({ rhr: 55, sleep: 85 }), { ...watchHistory, hrv: [], resp: [] });
-    expect(r.limited).toBe(true);
+    expect(r.limited).toBe(false);
+    expect(r.unsupported).toEqual(["hrv", "resp"]);
     expect(r.missing).toEqual(["hrv", "resp"]);
     expect(r.contributors.find((c) => c.key === "rhr")!.weight).toBeCloseTo(45 / 85, 4);
     expect(r.recovery).not.toBeNull();
     // Everything the device ever provides is here: no shrink.
     expect(r.shrink).toBe(1);
     expect(r.z).toBe(r.zRaw);
+  });
+
+  it("Apple Watch missing HRV today: limited, HRV is not unsupported", () => {
+    const r = scoreRecovery(today({ rhr: 55, resp: 14.6, sleep: 85 }), watchHistory);
+    expect(r.limited).toBe(true);
+    expect(r.missing).toEqual(["hrv"]);
+    expect(r.unsupported).toEqual([]);
   });
 
   it("RHR only (e.g. a night the watch wasn't worn): still scored, limited, and shrunk toward average", () => {
@@ -181,6 +190,13 @@ describe("scoreRecovery by device profile", () => {
     expect(r).toMatchObject({ recovery: null, band: null, reason: "no_data", limited: true });
   });
 
+  it("an input with a value today but no baseline yet is neither limited nor unsupported", () => {
+    const r = scoreRecovery(today({ rhr: 55, hrv: 60, resp: 14.6, sleep: 85 }), { ...watchHistory, hrv: [61, 59] });
+    expect(r.limited).toBe(false);
+    expect(r.missing).toEqual(["hrv"]);
+    expect(r.unsupported).toEqual([]);
+  });
+
   it("HRV or resp alone isn't enough", () => {
     expect(scoreRecovery(today({ hrv: 60, resp: 14 }), watchHistory).reason).toBe("no_data");
   });
@@ -208,7 +224,9 @@ describe("calibration phase", () => {
     const r = scoreRecovery(today({ rhr: 55, hrv: 60, sleep: 85 }), { ...watchHistory, hrv: [61, 59] });
     expect(r.recovery).not.toBeNull();
     expect(r.missing).toContain("hrv");
+    // Resp is in the user's expected set and missing today; HRV has a value, just no baseline yet.
     expect(r.limited).toBe(true);
+    expect(r.unsupported).toEqual([]);
     // HRV isn't in the full set yet; only the missing resp costs anything.
     expect(r.expected).toEqual(["rhr", "resp", "sleep"]);
     expect(r.shrink).toBeCloseTo(Math.sqrt(85 / 100), 4);

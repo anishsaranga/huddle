@@ -37,7 +37,14 @@
  *
  * Null when neither resting HR nor sleep score exists on D (`no_data`), or
  * when they exist but neither has 4 baseline days yet (`calibrating`, with
- * `calibrationDaysLeft`). `limited` = HRV or any other input missing.
+ * `calibrationDaysLeft`).
+ *
+ * `limited` means "missing something you normally have": true only when an
+ * input in the user's expected set (inputs with a baseline) has no value today.
+ * A Fitbit user (no HRV, ever) with resting HR + resp + sleep is NOT limited.
+ * `unsupported` lists inputs never available for the user (no baseline and no
+ * value today, e.g. HRV for Fitbit) so the UI can say so calmly. `missing`
+ * stays "inputs that didn't count today" (no value or no baseline).
  */
 
 import { robustBaseline, SD_FLOOR } from "@/lib/scores/baseline";
@@ -89,6 +96,7 @@ export type RecoveryReason = "no_data" | "calibrating";
 export type RecoveryResult = {
   recovery: number | null;
   band: RecoveryBand | null;
+  /** An input the user normally has (has a baseline) is missing today. */
   limited: boolean;
   /** Composite z after the partial-data shrink (null when no score). */
   z: number | null;
@@ -101,6 +109,8 @@ export type RecoveryResult = {
   contributors: Contributor[];
   /** Inputs with no value today or no baseline yet. */
   missing: RecoveryKey[];
+  /** Inputs never available for this user: no baseline and no value today. */
+  unsupported: RecoveryKey[];
   reason?: RecoveryReason;
   /** Days of baseline still needed (only with reason `calibrating`). */
   calibrationDaysLeft?: number;
@@ -157,7 +167,8 @@ export function scoreRecovery(today: RecoveryValues, history: RecoveryHistory): 
   const hasBaseline = {} as Record<RecoveryKey, boolean>;
   for (const k of RECOVERY_KEYS) hasBaseline[k] = baselines[k] !== null;
   const expected = RECOVERY_KEYS.filter((k) => hasBaseline[k]);
-  const none = { z: null, zRaw: null, shrink: null, expected, contributors: [] as Contributor[], missing };
+  const unsupported = RECOVERY_KEYS.filter((k) => !hasBaseline[k] && !isNum(today[k]));
+  const none = { z: null, zRaw: null, shrink: null, expected, contributors: [] as Contributor[], missing, unsupported };
 
   const coreToday = (["rhr", "sleep"] as const).filter((k) => isNum(today[k]));
   if (coreToday.length === 0) {
@@ -202,12 +213,13 @@ export function scoreRecovery(today: RecoveryValues, history: RecoveryHistory): 
   return {
     recovery,
     band: recoveryBand(recovery),
-    limited: missing.length > 0,
+    limited: expected.some((k) => !present[k]),
     z: round(z * shrink, 3),
     zRaw: round(z, 3),
     shrink: round(shrink, 4),
     expected,
     contributors,
     missing,
+    unsupported,
   };
 }

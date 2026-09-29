@@ -91,6 +91,23 @@ export function limitedExplainer(rec: RecoveryResult | null | undefined, facts: 
   return `${parts.join(". ")} — recovery uses ${used.length ? joinList(used) : "what's available"}.`;
 }
 
+/**
+ * A calm, neutral line for inputs this user's devices never provide, shown
+ * only when recovery is NOT limited (nothing is missing that they normally
+ * have). Null when nothing is unsupported or there's no score.
+ *
+ *   "HRV isn't shared by your Fitbit — recovery uses resting HR, breathing rate and sleep."
+ */
+export function unsupportedNote(rec: RecoveryResult | null | undefined, device: string): string | null {
+  const unsupported = rec?.unsupported ?? [];
+  if (!rec || rec.recovery === null || rec.limited || unsupported.length === 0) return null;
+  const who = device === "tracker" ? "your tracker" : `your ${device}`;
+  const what = joinList(unsupported.map((k) => RECOVERY_INPUT_LABEL[k]));
+  const verb = unsupported.length === 1 ? "isn't" : "aren't";
+  const used = rec.contributors.map((c) => RECOVERY_INPUT_LABEL[c.key]);
+  return `${capitalize(what)} ${verb} shared by ${who} — recovery uses ${used.length ? joinList(used) : "what's available"}.`;
+}
+
 /** Calibration progress for the "3 of 4 days" ring. */
 export function calibrationProgress(rec: RecoveryResult | null | undefined, needed = 4): { done: number; needed: number } | null {
   if (!rec || rec.reason !== "calibrating") return null;

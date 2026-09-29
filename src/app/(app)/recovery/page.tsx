@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { Dial } from "@/components/charts/Dial";
 import { DeviationBar } from "@/components/dashboard/Bars";
-import { CardHead, Chip, Notice } from "@/components/dashboard/bits";
+import { CardHead, Chip, InfoGlyph, Notice } from "@/components/dashboard/bits";
 import { DetailHeader } from "@/components/dashboard/DetailHeader";
 import { TrendCard } from "@/components/dashboard/TrendCard";
 import { AmbientGlow } from "@/components/ui/AmbientGlow";
@@ -14,6 +14,7 @@ import {
   calibrationProgress,
   limitedExplainer,
   recoveryNullReason,
+  unsupportedNote,
 } from "@/lib/dashboard/explain";
 import { deviceName } from "@/lib/dashboard/format";
 import { loadDashboardDay } from "@/lib/dashboard/load";
@@ -55,6 +56,7 @@ export default async function RecoveryPage({ searchParams }: PageProps<"/recover
   const calibration = calibrationProgress(rec);
   const reason = recoveryNullReason(rec, { isToday, facts: ctx.facts, sleep: comp?.sleep ?? null });
   const limited = limitedExplainer(rec, ctx.facts, device);
+  const unsupported = unsupportedNote(rec, device);
   const prev = overview.previous?.recovery ?? null;
   const delta = value !== null && prev !== null ? value - prev : null;
 
@@ -192,6 +194,12 @@ export default async function RecoveryPage({ searchParams }: PageProps<"/recover
                   </li>
                 ))}
               </ul>
+              {unsupported && (
+                <p className="mt-3 flex items-start gap-2 border-t border-hairline pt-3 text-[13px] leading-snug text-muted">
+                  <InfoGlyph className="mt-[2px] shrink-0" />
+                  <span>{unsupported}</span>
+                </p>
+              )}
             </Card>
           </StaggerItem>
         )}

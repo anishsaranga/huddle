@@ -13,7 +13,7 @@ import type { MetricValues } from "@/lib/health/fields";
  * scores. It is written into `daily_scores.components.v`, so stale rows can be
  * found (`scores:recompute` rewrites them).
  */
-export const SCORE_VERSION = 2;
+export const SCORE_VERSION = 3;
 
 /** Personal baselines look at the 30 days before the date (D-30..D-1). */
 export const BASELINE_DAYS = 30;
