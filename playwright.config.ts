@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { E2E_ADMIN_EMAIL } from "./tests/support/e2e";
 import { TEST_DATABASE_URL } from "./tests/support/test-db";
 
 /**
@@ -20,6 +21,8 @@ export default defineConfig({
       E2E_AUTH: "1",
       NEXT_DIST_DIR: ".next-e2e",
       DATABASE_URL: TEST_DATABASE_URL,
+      // The account that is admin on this server (whatever .env says).
+      ADMIN_EMAIL: E2E_ADMIN_EMAIL,
       // Deterministic "Google not configured" behavior regardless of .env.
       AUTH_GOOGLE_ID: "",
       AUTH_GOOGLE_SECRET: "",

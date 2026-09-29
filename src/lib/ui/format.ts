@@ -12,3 +12,15 @@ export function formatNumber(value: number, decimals = 0): string {
   }
   return fmt.format(value);
 }
+
+const shortDate = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** "28 Sep 2026". Locale- and timezone-pinned so server and client render identically. */
+export function formatShortDate(date: Date): string {
+  return shortDate.format(date);
+}

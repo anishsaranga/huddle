@@ -29,6 +29,21 @@ export default async function ProfilePage() {
             )}
           </Card>
         </StaggerItem>
+        {user.isAdmin && (
+          <StaggerItem>
+            <Card variant="interactive" href="/admin" chevron ariaLabel="Admin">
+              <p className="telemetry mb-2" style={{ color: "var(--strain)" }}>
+                Admin
+              </p>
+              <p className="font-display text-[26px] font-semibold uppercase leading-none tracking-[0.02em]">
+                Manage Huddle
+              </p>
+              <p className="mt-2 text-[14px] leading-snug text-muted">
+                Allowlist, groups and users.
+              </p>
+            </Card>
+          </StaggerItem>
+        )}
         <StaggerItem>
           <Card>
             <p className="label mb-2">Coming soon</p>

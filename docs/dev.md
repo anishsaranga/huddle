@@ -21,7 +21,11 @@ npm run dev                 # http://localhost:3000
 - `is_admin` is recomputed on every sign-in (`enforceAdminFlags()` in `src/lib/auth-db.ts`): true only for
   `ADMIN_EMAIL`. Changing `ADMIN_EMAIL` demotes the old admin on the next sign-in by anyone.
 - Emails are stored lowercase (CHECK constraints on `users.email` and `allowed_emails.email`).
-- Adding a friend before the admin UI exists:
+- The admin panel lives at `/admin` (allowlist, groups, users; 404 for non-admins; entry card on `/profile`). Mutations are
+  server actions in `src/app/admin/actions.ts`, backed by `src/lib/admin/*`. `onUserDeactivated()` in
+  `src/lib/admin/lifecycle.ts` is where M3 adds API-key revocation. The e2e server sets `ADMIN_EMAIL=e2e-admin@example.com`
+  (`tests/support/e2e.ts`).
+- Adding a friend without the admin UI:
   `docker exec huddle-db psql -U huddle -d huddle -c "insert into allowed_emails(email) values ('friend@gmail.com')"`
 - Route protection:
   - `src/proxy.ts` (Next 16's renamed middleware) only checks that a session cookie exists: pages redirect to
