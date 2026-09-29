@@ -1,23 +1,46 @@
 @import "tailwindcss";
 
-/* ---------- Design tokens ---------- */
+/* =====================================================================
+   Huddle design tokens — "night-lab telemetry"
+   Ink-black instrument panel. Color is signal only; everything else grey.
+   ===================================================================== */
 :root {
+  /* Surfaces */
   --bg: #0a0b0d;
   --bg-top: #12151a;
   --card: #15171b;
   --card-elevated: #1c1f24;
+  --card-sunken: #101215;
   --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.14);
+  --track: rgba(255, 255, 255, 0.07);
+
+  /* Text — muted is body-copy safe (≥4.5:1 on bg and card); dim is
+     decorative / large-only. */
   --text: #ffffff;
+  --text-2: #c8ccd3;
   --muted: #8a9099;
   --dim: #5b616b;
 
+  /* Signal */
   --recovery-green: #2bd67b;
   --recovery-yellow: #f4c53d;
   --recovery-red: #ff5a5f;
   --strain: #3d9bff;
   --sleep: #8c9bff;
 
+  /* Sleep stages (periwinkle family) */
+  --stage-awake: #dfe3ff;
+  --stage-rem: #adb7ff;
+  --stage-core: #8c9bff;
+  --stage-deep: #5d66e0;
+
+  /* Geometry */
+  --radius-card: 18px;
   --tabbar-h: 58px;
+
+  /* Film grain (SVG turbulence, rasterised once as a tile) */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 
   color-scheme: dark;
 }
@@ -27,8 +50,11 @@
   --color-bg-top: var(--bg-top);
   --color-card: var(--card);
   --color-card-elevated: var(--card-elevated);
+  --color-card-sunken: var(--card-sunken);
   --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
   --color-text: var(--text);
+  --color-text-2: var(--text-2);
   --color-muted: var(--muted);
   --color-dim: var(--dim);
 
@@ -38,8 +64,11 @@
   --color-strain: var(--strain);
   --color-sleep: var(--sleep);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --radius-card: var(--radius-card);
+
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-display: var(--font-barlow-condensed), "Arial Narrow", ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* ---------- Base ---------- */
@@ -69,6 +98,70 @@ textarea {
   font-size: 16px;
 }
 
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* ---------- Surfaces ---------- */
+@layer components {
+  /* Card: faint top-lit gradient, 1px gradient edge (bright at top),
+     inner bottom shadow, soft drop. Static — never animated. */
+  .surface {
+    position: relative;
+    border-radius: var(--radius-card);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, rgb(255 255 255 / 0) 45%),
+      var(--card);
+    box-shadow:
+      inset 0 -1px 0 0 rgb(0 0 0 / 0.35),
+      0 1px 2px rgb(0 0 0 / 0.45),
+      0 18px 36px -24px rgb(0 0 0 / 0.9);
+  }
+  .surface::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.13) 0%,
+      rgb(255 255 255 / 0.045) 30%,
+      rgb(255 255 255 / 0.025) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .surface-elevated {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0) 50%),
+      var(--card-elevated);
+  }
+  .surface-elevated::before {
+    background: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.2) 0%,
+      rgb(255 255 255 / 0.06) 30%,
+      rgb(255 255 255 / 0.03) 100%
+    );
+  }
+
+  .grain {
+    background-image: var(--grain);
+    background-size: 180px 180px;
+  }
+}
+
 /* ---------- Utilities ---------- */
 @layer utilities {
   /* Small ALL-CAPS label */
@@ -77,8 +170,25 @@ textarea {
     line-height: 1.2;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.14em;
     color: var(--muted);
+  }
+
+  /* Telemetry micro-label: mono, caps, wide tracking */
+  .telemetry {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.3;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 
   /* Safe-area helpers */
@@ -100,10 +210,91 @@ textarea {
     -webkit-overflow-scrolling: touch;
   }
 
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* App chrome (tab bar, etc.) should not be selectable / long-press callout */
   .nav-chrome {
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+  }
+}
+
+/* ---------- Looping ambient motion (compositor-only: transform/opacity) ---------- */
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.07);
+  }
+}
+
+@keyframes dot-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-breathe {
+  animation: glow-breathe 6s ease-in-out infinite;
+  transform-origin: 50% 0%;
+  will-change: transform, opacity;
+}
+
+.animate-dot-pulse {
+  animation: dot-pulse 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.animate-shimmer {
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.animate-spin-fast {
+  animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-breathe,
+  .animate-dot-pulse,
+  .animate-shimmer {
+    animation: none;
+  }
+  .animate-dot-pulse {
+    opacity: 0;
+  }
+  .animate-spin-fast {
+    animation-duration: 2.4s;
   }
 }

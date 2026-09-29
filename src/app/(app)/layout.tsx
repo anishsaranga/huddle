@@ -4,7 +4,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-dvh flex-col">
       <main
-        className="scroll-area flex-1"
+        className="scroll-area flex-1 overflow-x-hidden"
         style={{
           paddingBottom: "calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px)",
         }}

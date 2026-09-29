@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import type { ReactElement } from "react";
+import { spring } from "@/lib/ui/motion";
+
+const MotionLink = motion.create(Link);
 
 type Tab = { href: string; label: string; icon: ReactElement };
 
@@ -76,19 +80,34 @@ export function TabBar() {
         {tabs.map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           return (
-            <li key={tab.href} className="flex-1">
-              <Link
+            <li key={tab.href} className="relative flex-1">
+              {active && (
+                <motion.span
+                  layoutId="tabbar-indicator"
+                  aria-hidden
+                  className="absolute inset-x-0 top-[-1px] mx-auto h-[2px] w-8 rounded-full bg-white shadow-[0_0_10px_rgb(255_255_255/0.55)]"
+                  transition={spring.snappy}
+                />
+              )}
+              <MotionLink
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex h-full flex-col items-center justify-center gap-1 transition-transform active:scale-[0.97] ${
-                  active ? "text-white" : "text-dim"
+                whileTap="pressed"
+                className={`flex h-full flex-col items-center justify-center gap-1 transition-colors duration-200 ${
+                  active ? "text-white" : "text-muted"
                 }`}
               >
-                {tab.icon}
+                <motion.span
+                  className="block"
+                  variants={{ pressed: { scale: 0.82 } }}
+                  transition={spring.bouncy}
+                >
+                  {tab.icon}
+                </motion.span>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.1em]">
                   {tab.label}
                 </span>
-              </Link>
+              </MotionLink>
             </li>
           );
         })}
