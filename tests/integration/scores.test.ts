@@ -7,7 +7,7 @@ import { ingestDeps } from "@/lib/ingest/handler";
 import { createLogger } from "@/lib/log";
 import { resetIngestLimiters } from "@/lib/ratelimit";
 import type { ScoreComponents } from "@/lib/scores/compute";
-import { getGroupBoard, getOverview, getTrend, weekStart } from "@/lib/scores/queries";
+import { getDataSpan, getGroupBoard, getOverview, getRecentNights, getTrend, weekStart } from "@/lib/scores/queries";
 import { FORWARD_DAYS, ingestRecomputeRange, recomputeAfterIngest, recomputeUser } from "@/lib/scores/recompute";
 import { SCORE_VERSION } from "@/lib/scores/types";
 import { addDays, todayIn } from "@/lib/tz";
@@ -266,6 +266,73 @@ describe("getOverview / getTrend", () => {
       .from(dailyScores)
       .where(and(eq(dailyScores.userId, user.id), eq(dailyScores.localDate, addDays(today, -3))));
     expect(strain.find((p) => p.date === addDays(today, -3))!.value).toBe(stored.strain);
+  });
+});
+
+describe("dashboard helpers", () => {
+  it("getDataSpan: nothing for a new user", async () => {
+    const { user } = await makeUser("watch");
+    expect(await getDataSpan(db, user.id)).toEqual({
+      firstDate: null,
+      lastDate: null,
+      hasHrv: false,
+      hasResp: false,
+      hasRhr: false,
+      lastSyncAt: null,
+    });
+  });
+
+  it("getDataSpan: first/last data date across tables and which vitals the device ever sent", async () => {
+    const watch = await makeUser("watch");
+    const today = await backfill(watch.key, "watch", 12);
+    const w = await getDataSpan(db, watch.user.id);
+    expect(w.firstDate).toBe(addDays(today, -11));
+    expect(w.lastDate).toBe(today);
+    expect(w).toMatchObject({ hasHrv: true, hasResp: true, hasRhr: true });
+    expect(w.lastSyncAt).toBeInstanceOf(Date);
+
+    const phone = await makeUser("iphone", "phone@example.com");
+    await backfill(phone.key, "iphone", 5);
+    expect(await getDataSpan(db, phone.user.id)).toMatchObject({ hasHrv: false, hasResp: false, hasRhr: false });
+
+    const fitbit = await makeUser("fitbit", "fitbit@example.com");
+    await backfill(fitbit.key, "fitbit", 5);
+    expect(await getDataSpan(db, fitbit.user.id)).toMatchObject({ hasHrv: false, hasResp: true, hasRhr: true });
+  });
+
+  it("getDataSpan: a night alone (no metrics) still counts as data", async () => {
+    const { user, key } = await makeUser("watch");
+    await post(key, {
+      tz: "Europe/Berlin",
+      days: [],
+      sleep_segments: [{ stage: "Core", start: "2026-03-01T23:00:00+01:00", end: "2026-03-02T06:30:00+01:00", source: "Apple Watch" }],
+    });
+    const s = await getDataSpan(db, user.id);
+    expect(s.firstDate).toBe("2026-03-02");
+    expect(s.lastDate).toBe("2026-03-02");
+    expect(s.hasRhr).toBe(false);
+  });
+
+  it("getRecentNights: the 7 nights ending on the date, oldest first", async () => {
+    const { user, key } = await makeUser("watch");
+    const today = await backfill(key, "watch", 20);
+    const date = addDays(today, -2);
+    const nights = await getRecentNights(db, user.id, date, 7);
+    expect(nights.length).toBeGreaterThanOrEqual(5);
+    expect(nights.every((n) => n.wakeDate >= addDays(date, -6) && n.wakeDate <= date)).toBe(true);
+    expect(nights.map((n) => n.wakeDate)).toEqual([...nights.map((n) => n.wakeDate)].sort());
+    expect(nights[0].bedStart.getTime()).toBeLessThan(nights[0].bedEnd.getTime());
+  });
+
+  it("getOverview.activity carries the day's totals (partial today)", async () => {
+    const { user, key } = await makeUser("watch");
+    const today = await backfill(key, "watch", 10);
+    const past = await getOverview(db, user.id, addDays(today, -1));
+    expect(past.activity.steps).toBeGreaterThan(1000);
+    expect(past.activity.activeKcal).toBeGreaterThan(0);
+    expect(past.activity.exerciseMin).not.toBeNull();
+    const empty = await getOverview(db, user.id, addDays(today, -40));
+    expect(empty.activity).toEqual({ steps: null, activeKcal: null, exerciseMin: null });
   });
 });
 

@@ -68,6 +68,9 @@ const tabs: Tab[] = [
   },
 ];
 
+/** Detail screens reached from Home keep the Home tab lit. */
+const HOME_DETAILS = ["/recovery", "/sleep", "/strain"];
+
 export function TabBar() {
   const pathname = usePathname();
 
@@ -78,7 +81,10 @@ export function TabBar() {
     >
       <ul className="mx-auto flex max-w-md items-stretch" style={{ height: "var(--tabbar-h)" }}>
         {tabs.map((tab) => {
-          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          const active =
+            pathname === tab.href ||
+            pathname.startsWith(`${tab.href}/`) ||
+            (tab.href === "/home" && HOME_DETAILS.some((d) => pathname === d || pathname.startsWith(`${d}/`)));
           return (
             <li key={tab.href} className="relative flex-1">
               {active && (

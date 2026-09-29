@@ -4,7 +4,7 @@
  * each (run in parallel), no per-user loops.
  */
 
-import { and, asc, between, desc, eq, inArray, isNull, max } from "drizzle-orm";
+import { and, asc, between, count, desc, eq, inArray, isNull, max, min } from "drizzle-orm";
 import {
   dailyMetrics,
   dailyScores,
@@ -79,6 +79,8 @@ export type Overview = {
   hrHourly: HourRow[];
   /** The night that ended on `date` and the chosen source's segments (plus in-bed from any source). */
   sleep: { night: OverviewNight; segments: OverviewSegment[] } | null;
+  /** The date's activity totals (partial for today). */
+  activity: { steps: number | null; activeKcal: number | null; exerciseMin: number | null };
   lastSyncAt: Date | null;
 };
 
@@ -128,6 +130,7 @@ export async function getOverview(db: Executor, userId: string, date: string): P
         resp_rate: dailyMetrics.resp_rate,
         steps: dailyMetrics.steps,
         active_kcal: dailyMetrics.active_kcal,
+        exercise_min: dailyMetrics.exercise_min,
       })
       .from(dailyMetrics)
       .where(and(eq(dailyMetrics.userId, userId), between(dailyMetrics.localDate, start, date))),
@@ -202,8 +205,85 @@ export async function getOverview(db: Executor, userId: string, date: string): P
     stats,
     hrHourly: hrRows,
     sleep,
+    activity: {
+      steps: metrics.get(date)?.steps ?? null,
+      activeKcal: metrics.get(date)?.active_kcal ?? null,
+      exerciseMin: metrics.get(date)?.exercise_min ?? null,
+    },
     lastSyncAt: sync?.at ?? null,
   };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Data span (Home date bounds, first-run check, which vitals a device sends) */
+/* ------------------------------------------------------------------------ */
+
+export type DataSpan = {
+  /** Earliest / latest local date with any stored input (metrics, hourly HR or a night); null = none. */
+  firstDate: string | null;
+  lastDate: string | null;
+  /** Whether the user has EVER sent these (a device that never writes HRV shouldn't get an HRV row). */
+  hasHrv: boolean;
+  hasResp: boolean;
+  hasRhr: boolean;
+  /** Most recent successful sync; null = never. */
+  lastSyncAt: Date | null;
+};
+
+/** Four small aggregate queries, run in parallel. */
+export async function getDataSpan(db: Executor, userId: string): Promise<DataSpan> {
+  const [[m], [n], [h], [sync]] = await Promise.all([
+    db
+      .select({
+        first: min(dailyMetrics.localDate),
+        last: max(dailyMetrics.localDate),
+        hrv: count(dailyMetrics.hrv_sdnn_ms),
+        resp: count(dailyMetrics.resp_rate),
+        rhr: count(dailyMetrics.resting_hr),
+      })
+      .from(dailyMetrics)
+      .where(eq(dailyMetrics.userId, userId)),
+    db
+      .select({ first: min(sleepNights.wakeDate), last: max(sleepNights.wakeDate) })
+      .from(sleepNights)
+      .where(eq(sleepNights.userId, userId)),
+    db
+      .select({ first: min(hrHourly.localDate), last: max(hrHourly.localDate) })
+      .from(hrHourly)
+      .where(eq(hrHourly.userId, userId)),
+    db
+      .select({ at: max(ingestEvents.receivedAt) })
+      .from(ingestEvents)
+      .where(and(eq(ingestEvents.userId, userId), eq(ingestEvents.status, 200))),
+  ]);
+  const firsts = [m?.first, n?.first, h?.first].filter((d): d is string => !!d).sort();
+  const lasts = [m?.last, n?.last, h?.last].filter((d): d is string => !!d).sort();
+  return {
+    firstDate: firsts[0] ?? null,
+    lastDate: lasts.at(-1) ?? null,
+    hasHrv: (m?.hrv ?? 0) > 0,
+    hasResp: (m?.resp ?? 0) > 0,
+    hasRhr: (m?.rhr ?? 0) > 0,
+    lastSyncAt: sync?.at ?? null,
+  };
+}
+
+export type NightWindow = { wakeDate: string; bedStart: Date; bedEnd: Date; asleepMin: number | null };
+
+/** Nights that ended on `endDate` and the `nights - 1` dates before it, oldest first (missing nights are absent). */
+export async function getRecentNights(db: Executor, userId: string, endDate: string, nights = 7): Promise<NightWindow[]> {
+  return db
+    .select({
+      wakeDate: sleepNights.wakeDate,
+      bedStart: sleepNights.bedStart,
+      bedEnd: sleepNights.bedEnd,
+      asleepMin: sleepNights.asleepMin,
+    })
+    .from(sleepNights)
+    .where(
+      and(eq(sleepNights.userId, userId), between(sleepNights.wakeDate, addDays(endDate, -(nights - 1)), endDate)),
+    )
+    .orderBy(asc(sleepNights.wakeDate));
 }
 
 /* ------------------------------------------------------------------------ */

@@ -60,3 +60,20 @@ export function deltaColor(delta: number, higherIsBetter: boolean): string {
 export function alpha(color: string, pct: number): string {
   return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 }
+
+/** Grey-blue used when there is no recovery to color the page by. */
+export const NEUTRAL_SIGNAL = "#7c8aa3";
+
+/** Recovery color, or the neutral grey-blue when there's no score. */
+export function recoveryColorOrNeutral(pct: number | null | undefined): string {
+  return typeof pct === "number" ? recoveryColor(pct) : NEUTRAL_SIGNAL;
+}
+
+/** Heart-rate zones 1-5: strain blue, from a faint tint (easy) to full signal with a hot core (max). */
+export const ZONE_COLORS = [
+  "color-mix(in srgb, var(--strain) 30%, #1a2230)",
+  "color-mix(in srgb, var(--strain) 50%, #1a2230)",
+  "color-mix(in srgb, var(--strain) 72%, #1a2230)",
+  "var(--strain)",
+  "color-mix(in srgb, var(--strain) 55%, #ffffff)",
+] as const;

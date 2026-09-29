@@ -19,6 +19,8 @@ type HypnogramProps = {
   endLabel?: string;
   /** Shorter rows for cards. */
   compact?: boolean;
+  /** Emphasize one stage (others dim). */
+  highlight?: SleepStage | null;
   ariaLabel: string;
   delay?: number;
   className?: string;
@@ -36,6 +38,7 @@ export function Hypnogram({
   startLabel,
   endLabel,
   compact = false,
+  highlight = null,
   ariaLabel,
   delay = 0,
   className = "",
@@ -71,8 +74,8 @@ export function Hypnogram({
           {STAGE_ORDER.map((s) => (
             <span
               key={s}
-              className="telemetry flex items-center text-[9.5px]"
-              style={{ height: rowH }}
+              className="telemetry flex items-center text-[9.5px] transition-colors duration-200"
+              style={{ height: rowH, color: highlight === s ? "var(--text)" : undefined }}
             >
               {STAGE_LABELS[s]}
             </span>
@@ -113,7 +116,7 @@ export function Hypnogram({
             <path
               d={riser}
               fill="none"
-              style={{ stroke: "rgba(255,255,255,0.22)" }}
+              style={{ stroke: "rgba(255,255,255,0.22)", opacity: highlight ? 0.35 : 1, transition: "opacity 200ms" }}
               strokeWidth={1}
               vectorEffect="non-scaling-stroke"
             />
@@ -125,7 +128,11 @@ export function Hypnogram({
                 width={Math.max(x(s.end) - x(s.start), 0.8)}
                 height={bar}
                 rx={1.5}
-                style={{ fill: STAGE_COLORS[s.stage] }}
+                style={{
+                  fill: STAGE_COLORS[s.stage],
+                  opacity: highlight && highlight !== s.stage ? 0.16 : 1,
+                  transition: "opacity 220ms",
+                }}
               />
             ))}
           </g>

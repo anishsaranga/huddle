@@ -165,3 +165,11 @@ Huddle's own formulas, all pure and documented at the top of each file: `sleep.t
 - The ingest hook (`hooks.ts`) recomputes from the earliest affected date to 37 days after the latest (30-day baselines + 7-night sleep consistency), capped at tomorrow.
 - `queries.ts`: `getOverview`, `getTrend` (`1w`/`1m`/`6m`), `getGroupBoard` (day or Mon-Sun week, >= 4 days, ties share a rank).
 - `npm run scores:recompute [-- --user <id|email|username>] [--from D] [--to D] [--show N]`: dev/test databases only (same guard as the seed). `db:seed` runs a full recompute at the end.
+
+## Personal dashboard (`/home`, `/recovery`, `/sleep`, `/strain`)
+
+- Server pages; data via `getDataSpan` / `getOverview` / `getTrend` / `getRecentNights` (`src/lib/scores/queries.ts`), loaded by `src/lib/dashboard/load.ts`. `?date=YYYY-MM-DD` is clamped to [first data date, today in the user's timezone] (`resolveDashboardDate`); today's URL has no `?date`.
+- Pure view helpers in `src/lib/dashboard/` (dates, formatting, null-score reasons and "limited data" sentences, trend series, sleep charts, the Home view model); all timezone formatting happens on the server. Unit tests: `tests/unit/dashboard-*.test.ts`.
+- Home is one client component (`components/overview/Overview.tsx`): day changes are `router.push(…, { scroll: false })` in a transition (chevrons are fully prefetched `<Link>`s, the dial row swipes, the date opens a month calendar sheet). Search params don't change the segment's state key, so the page stays mounted and nothing flashes to the skeleton.
+- Never synced (no successful ingest and no data) → Home shows the "Connect your iPhone" card and the detail screens redirect to Home.
+- E2E: `tests/e2e/dashboard.spec.ts` seeds users through the real `POST /api/ingest` with the dev-seed generator, in a timezone where it's currently afternoon (so "today" always has a finished night).

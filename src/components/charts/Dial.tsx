@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { CountUp } from "@/components/ui/CountUp";
 import { alpha } from "@/lib/ui/colors";
 import { formatNumber } from "@/lib/ui/format";
@@ -32,6 +32,14 @@ type DialProps = {
   ticks?: boolean;
   /** Seconds before the sweep starts. */
   delay?: number;
+  /** No value: dashed hollow track and a dimmed center (pair with display="—"). */
+  hollow?: boolean;
+  /** Extra line(s) under the md label (reason, LIMITED chip, LIVE dot). */
+  footer?: ReactNode;
+  /** Hide the md label (for rings used as inline gauges). */
+  hideLabel?: boolean;
+  /** Replaces the generated accessible name. */
+  ariaLabel?: string;
   className?: string;
 };
 
@@ -63,6 +71,10 @@ export function Dial({
   sublabel,
   ticks,
   delay = 0,
+  hollow = false,
+  footer,
+  hideLabel = false,
+  ariaLabel,
   className = "",
 }: DialProps) {
   const reduced = useReducedMotion();
@@ -103,7 +115,7 @@ export function Dial({
       className={`flex flex-col items-center gap-2.5 ${className}`}
       role="img"
       style={{ "--dial-color": color } as React.CSSProperties}
-      aria-label={`${label}: ${spoken}${sublabel ? `, ${sublabel}` : ""}`}
+      aria-label={ariaLabel ?? `${label}: ${spoken}${sublabel ? `, ${sublabel}` : ""}`}
     >
       <div className="relative" style={{ width: px, height: px }}>
         {glow && (
@@ -165,8 +177,10 @@ export function Dial({
             cy={center}
             r={radius}
             fill="none"
-            style={{ stroke: "var(--track)" }}
-            strokeWidth={stroke}
+            style={{ stroke: hollow ? "rgba(255,255,255,0.2)" : "var(--track)" }}
+            strokeWidth={hollow ? Math.max(1.5, r2(stroke * 0.3)) : stroke}
+            strokeDasharray={hollow ? `${r2(stroke * 0.3)} ${r2(stroke * 0.95)}` : undefined}
+            strokeLinecap={hollow ? "round" : undefined}
           />
 
           {glow && (
@@ -221,7 +235,7 @@ export function Dial({
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className="font-display font-semibold leading-none text-text"
+            className={`font-display font-semibold leading-none ${hollow ? "text-dim" : "text-text"}`}
             style={{ fontSize: font, letterSpacing: variant === "sm" ? 0 : "0.01em" }}
           >
             {display !== undefined ? (
@@ -245,7 +259,8 @@ export function Dial({
           )}
         </div>
       </div>
-      {variant === "md" && <span className="label">{label}</span>}
+      {variant === "md" && !hideLabel && <span className="label">{label}</span>}
+      {variant === "md" && footer}
     </div>
   );
 }

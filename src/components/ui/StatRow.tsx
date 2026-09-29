@@ -16,6 +16,10 @@ type StatRowProps = {
   /** Custom baseline text, same idea as `display`. */
   baselineDisplay?: string;
   icon?: ReactNode;
+  /** Mono note before the baseline, e.g. "SO FAR" for today's partial totals. */
+  note?: string;
+  /** Show the ▲/▼ delta marker. Default true (only drawn with a baseline). */
+  showDelta?: boolean;
   className?: string;
 };
 
@@ -33,6 +37,8 @@ export function StatRow({
   display,
   baselineDisplay,
   icon,
+  note,
+  showDelta = true,
   className = "",
 }: StatRowProps) {
   const hasBaseline = typeof baseline === "number";
@@ -53,15 +59,21 @@ export function StatRow({
       {icon && <span className="shrink-0 text-muted">{icon}</span>}
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-medium leading-tight text-text">{label}</p>
-        {hasBaseline && (
+        {(hasBaseline || note) && (
           <p className="telemetry mt-1">
-            30D <span className="text-text-2">{baseText}</span>
-            {unit ? ` ${unit}` : ""}
+            {note && <span className="text-text-2">{note}</span>}
+            {note && hasBaseline && <span aria-hidden> · </span>}
+            {hasBaseline && (
+              <>
+                30D <span className="text-text-2">{baseText}</span>
+                {unit ? ` ${unit}` : ""}
+              </>
+            )}
           </p>
         )}
       </div>
       <div className="flex shrink-0 items-baseline gap-1.5">
-        {hasBaseline && (
+        {hasBaseline && showDelta && (
           <span
             aria-hidden
             className="relative -top-[2px] w-3 text-center text-[10px] leading-none"
@@ -75,7 +87,7 @@ export function StatRow({
         </span>
         {unit && <span className="telemetry w-9 text-left">{unit}</span>}
       </div>
-      {hasBaseline && (
+      {hasBaseline && showDelta && (
         <span className="sr-only">
           {`${direction} 30-day baseline of ${baseText}${unit ? ` ${unit}` : ""}${verdict}`}
         </span>
