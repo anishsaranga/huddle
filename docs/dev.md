@@ -120,8 +120,28 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
   regenerate / revoke). Mutations: `src/lib/apikey-actions.ts`. The ingest URL shown is `${APP_URL}/api/ingest`.
 - Metric fields are defined once in `src/lib/health/fields.ts` (name, column, unit, int/float, range, label, category);
   `daily_metrics` columns are generated from it. Ingest event summary types: `src/lib/ingest/types.ts`.
-- `GET /api/me/sync-status` accepts a session or an API key (Bearer or `?key=`); a bad key gets a bare 401. The proxy lets
+- `GET /api/me/sync-status` accepts a session or an API key (Bearer or `?key=`); a bad key gets a bare 401. Besides the last
+  successful sync it returns `last_attempt` (`{ at, status, shape, error? }` of the newest ingest event of any status; `error` is the
+  first validation issue as `path: message` with quoted payload strings redacted, or the error code; `src/lib/sync/attempt.ts`) and
+  `server_time`. The proxy lets
   key-bearing requests to it through (`acceptsApiKey` in `route-access.ts`).
+
+## Setup guide and Sync now (`/setup`, `/sync`)
+
+- `/setup` (`components/setup/*`): hero with progress (installed = any recorded ingest attempt, Health = data arrived, automated =
+  successful syncs on 2+ days this week), a live status strip (polls sync-status every 10 s; red banner when the last attempt
+  failed), the URL and key card ("Show a new key" regenerates and reveals once; the key then also appears inline in the recipe),
+  Option A (`SHORTCUT_ICLOUD_URL`) / Option B (the whole Huddle Sync recipe as a checklist with a device picker; per-device metric
+  support lives in `src/lib/sync/recipe.ts`, checked against `fields.ts` by `tests/unit/sync-recipe.test.ts`), Health access,
+  automation, backfill and troubleshooting. Step progress and the device pick are kept in localStorage.
+- `/sync` (`components/sync/*`): the orb plus "Sync now". The tap opens
+  `shortcuts://run-shortcut?name=<SHORTCUT_NAME>&input=text&text=force` (no x-callback: iOS would return to Safari, not the PWA).
+  The flow is the pure reducer in `src/lib/sync/machine.ts`: a result counts only if `last_attempt.at` is after the tap in server
+  time (clock offset measured from `server_time`). Once the page has been hidden and is visible again it polls every 3 s for 60 s
+  (Synced / Error / "Didn't hear"); still visible 4 s after the tap means "Open this on your iPhone". The pending sync is kept in
+  sessionStorage, so a PWA that iOS reloads on return picks it up.
+- E2E hooks: `window.__huddleSync = { openUrl, pollMs, timeoutMs, stayedMs }` (set with `page.addInitScript`) captures the
+  `shortcuts://` navigation and shortens the timers; see `tests/e2e/sync.spec.ts`.
 
 ## Ingest (`POST /api/ingest`)
 

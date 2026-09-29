@@ -211,5 +211,5 @@ test("profile: sections, links and placeholder rows", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 
   await page.getByRole("link", { name: /Sync setup/ }).click();
-  await expect(page.getByRole("heading", { name: "Sync setup" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Connect your\s*iPhone/ })).toBeVisible();
 });

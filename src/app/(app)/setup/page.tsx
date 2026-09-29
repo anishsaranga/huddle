@@ -1,25 +1,38 @@
-import { PageHeader } from "@/components/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Stagger, StaggerItem } from "@/components/ui/Stagger";
+import { SetupGuide } from "@/components/setup/SetupGuide";
+import { db } from "@/db";
+import { getKeyStatus } from "@/lib/apikey";
+import { getIngestUrl } from "@/lib/app-url";
+import { getEnv } from "@/lib/env";
+import { requireOnboardedUser } from "@/lib/session";
+import { getRecentSyncDays, getSyncStatus } from "@/lib/sync-status";
 
 export const metadata = { title: "Sync setup" };
 
-/** Placeholder: the step-by-step Shortcut guide arrives with API keys (M3). */
-export default function SetupPage() {
+/** The iPhone Shortcut setup guide, personalized with the user's URL, key and sync progress. */
+export default async function SetupPage() {
+  const user = await requireOnboardedUser();
+  const [key, ingestUrl, status, syncDays] = await Promise.all([
+    getKeyStatus(db, user.id),
+    getIngestUrl(),
+    getSyncStatus(db, user.id),
+    getRecentSyncDays(db, user.id),
+  ]);
+  const env = getEnv();
+
   return (
-    <>
-      <PageHeader title="Sync setup" subtitle="iPhone Shortcut" />
-      <Stagger className="space-y-3 px-4">
-        <StaggerItem>
-          <Card>
-            <p className="label mb-2">Guide coming soon</p>
-            <p className="text-[15px] leading-relaxed text-muted">
-              Huddle reads your Apple Health data through an iOS Shortcut. The step-by-step setup guide, with your
-              personal sync key, lands here shortly.
-            </p>
-          </Card>
-        </StaggerItem>
-      </Stagger>
-    </>
+    <SetupGuide
+      ingestUrl={ingestUrl}
+      keyStatus={{
+        active: key.active,
+        prefixHint: key.prefixHint,
+        createdAt: key.createdAt?.toISOString() ?? null,
+        lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
+      }}
+      initialStatus={status}
+      automated={syncDays >= 2}
+      shortcutName={env.SHORTCUT_NAME}
+      icloudUrl={env.SHORTCUT_ICLOUD_URL ?? null}
+      renderedAt={Date.parse(status.server_time)}
+    />
   );
 }

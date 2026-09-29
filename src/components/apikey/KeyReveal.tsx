@@ -38,7 +38,7 @@ const WarnIcon = () => (
 );
 
 /** Copy with success/failure toasts and a transient "copied" flag for the check animation. */
-function useCopy(what: string) {
+export function useCopy(what: string) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
@@ -59,7 +59,7 @@ function useCopy(what: string) {
 }
 
 /** Icon swap between copy and an animated check. */
-function CopyGlyph({ copied, size }: { copied: boolean; size?: number }) {
+export function CopyGlyph({ copied, size }: { copied: boolean; size?: number }) {
   return (
     <span className="relative grid place-items-center" style={{ width: size ?? 18, height: size ?? 18 }}>
       <AnimatePresence initial={false} mode="popLayout">
@@ -128,6 +128,8 @@ type KeyRevealProps = {
   apiKey: string;
   /** `${APP_URL}/api/ingest`. */
   ingestUrl: string;
+  /** Show the ingest URL under the key (default true; /setup shows it separately). */
+  showIngestUrl?: boolean;
 };
 
 /**
@@ -135,7 +137,7 @@ type KeyRevealProps = {
  * monospace field, a big Copy button with a check animation, a "you won't
  * see this again" warning, and the ingest URL with its own copy button.
  */
-export function KeyReveal({ apiKey, ingestUrl }: KeyRevealProps) {
+export function KeyReveal({ apiKey, ingestUrl, showIngestUrl = true }: KeyRevealProps) {
   const { copied, copy } = useCopy("Key");
   const prefix = apiKey.slice(0, 3);
   const rest = apiKey.slice(3);
@@ -198,9 +200,11 @@ export function KeyReveal({ apiKey, ingestUrl }: KeyRevealProps) {
         </span>
       </p>
 
-      <div className="mt-4">
-        <CopyField label="Ingest URL" value={ingestUrl} testId="ingest-url" />
-      </div>
+      {showIngestUrl && (
+        <div className="mt-4">
+          <CopyField label="Ingest URL" value={ingestUrl} testId="ingest-url" />
+        </div>
+      )}
     </div>
   );
 }

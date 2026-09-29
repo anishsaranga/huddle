@@ -1,23 +1,22 @@
-import { PageHeader } from "@/components/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Stagger, StaggerItem } from "@/components/ui/Stagger";
+import { SyncScreen } from "@/components/sync/SyncScreen";
+import { db } from "@/db";
+import { getKeyStatus } from "@/lib/apikey";
+import { getEnv } from "@/lib/env";
+import { requireOnboardedUser } from "@/lib/session";
+import { getSyncStatus } from "@/lib/sync-status";
 
 export const metadata = { title: "Sync" };
 
-export default function SyncPage() {
+/** Sync tab: "Sync now" (runs the Shortcut, then listens for its ingest) and the last sync at a glance. */
+export default async function SyncPage() {
+  const user = await requireOnboardedUser();
+  const [key, status] = await Promise.all([getKeyStatus(db, user.id), getSyncStatus(db, user.id)]);
   return (
-    <>
-      <PageHeader title="Sync" subtitle="Health data" />
-      <Stagger className="space-y-3 px-4">
-        <StaggerItem>
-          <Card>
-            <p className="label mb-2">Coming soon</p>
-            <p className="text-[15px] leading-relaxed text-muted">
-              Import your health data and see when you last synced.
-            </p>
-          </Card>
-        </StaggerItem>
-      </Stagger>
-    </>
+    <SyncScreen
+      initial={status}
+      hasKey={key.active}
+      shortcutName={getEnv().SHORTCUT_NAME}
+      renderedAt={Date.parse(status.server_time)}
+    />
   );
 }
