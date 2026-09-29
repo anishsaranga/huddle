@@ -18,6 +18,17 @@ export type GroupSummary = {
 
 const PREVIEW_LIMIT = 4;
 
+/**
+ * Members added together (one INSERT, or one transaction) share the same
+ * joined_at, so joined_at alone is not a total order. Break ties by the label
+ * shown in the UI, then id, so listings are stable.
+ */
+const memberOrder = () => [
+  asc(groupMembers.joinedAt),
+  asc(sql`coalesce(${users.displayName}, ${users.name}, ${users.username}, ${users.email})`),
+  asc(users.id),
+];
+
 const labelOf = (u: {
   displayName: string | null;
   name: string | null;
@@ -40,7 +51,7 @@ export async function listGroups(db: Db): Promise<GroupSummary[]> {
     })
     .from(groupMembers)
     .innerJoin(users, eq(users.id, groupMembers.userId))
-    .orderBy(asc(groupMembers.joinedAt));
+    .orderBy(...memberOrder());
 
   const byGroup = new Map<string, MemberPreview[]>();
   const counts = new Map<string, number>();
@@ -98,7 +109,7 @@ export async function getGroupDetail(db: Db, groupId: string): Promise<GroupDeta
     .from(groupMembers)
     .innerJoin(users, eq(users.id, groupMembers.userId))
     .where(eq(groupMembers.groupId, groupId))
-    .orderBy(asc(groupMembers.joinedAt));
+    .orderBy(...memberOrder());
 
   const memberIds = members.map((m) => m.id);
   const others = await db
@@ -113,7 +124,7 @@ export async function getGroupDetail(db: Db, groupId: string): Promise<GroupDeta
     .where(
       and(isNull(users.deactivatedAt), memberIds.length ? notInArray(users.id, memberIds) : undefined),
     )
-    .orderBy(asc(users.createdAt));
+    .orderBy(asc(users.createdAt), asc(users.id));
 
   return {
     group: { id: group.id, name: group.name, timezone: group.timezone },
