@@ -88,7 +88,7 @@ describe("parsePayload shapes", () => {
     const object = ok({ days: [day], tz: "Europe/Berlin", sleep_segments: [] });
     expect(single.shape).toBe("day");
     expect(array.shape).toBe("array");
-    expect(object.shape).toBe("object");
+    expect(object.shape).toBe("days");
     expect(object.tz).toBe("Europe/Berlin");
     for (const p of [single, array, object]) {
       expect(p.days[0]).toEqual({ date: "2026-09-28", metrics: { steps: 8000, resting_hr: 52 }, hrHourly: undefined, segments: [] });

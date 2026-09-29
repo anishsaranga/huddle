@@ -218,3 +218,27 @@ export function parseTimestamp(input: string, tz: string): number | null {
 
   return null;
 }
+
+// "Sep 28, 2026", "September 28 2026"
+const US_DATE_RE = /^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/;
+// "28 Sep 2026", "28 September, 2026"
+const INTL_DATE_RE = /^(\d{1,2})\s+([A-Za-z]+)\.?,?\s+(\d{4})$/;
+
+/**
+ * A date without a time, as a Shortcut may send a day: `YYYY-MM-DD`, or the
+ * English date-only formats (`Sep 28, 2026`, `28 Sep 2026`). Returns
+ * `YYYY-MM-DD`, or null when it isn't one of these (or not a real date).
+ */
+export function parseLocalDate(input: string): string | null {
+  const s = input.replace(/[   ]/g, " ").replace(/\s+/g, " ").trim();
+  if (isRealDate(s)) return s;
+  const us = US_DATE_RE.exec(s);
+  const intl = us ? null : INTL_DATE_RE.exec(s);
+  // [month name, day, year]
+  const parts = us ? [us[1], us[2], us[3]] : intl ? [intl[2], intl[1], intl[3]] : null;
+  const name = parts?.[0].toLowerCase() ?? "";
+  const mo = Object.hasOwn(MONTHS, name) ? MONTHS[name] : undefined;
+  if (!parts || !mo) return null;
+  const date = `${pad(Number(parts[2]), 4)}-${pad(mo)}-${pad(Number(parts[1]))}`;
+  return isRealDate(date) ? date : null;
+}

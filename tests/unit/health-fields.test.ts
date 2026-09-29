@@ -27,6 +27,24 @@ describe("METRIC_FIELDS", () => {
     expect(cols.size).toBe(METRIC_FIELDS.length + 4);
   });
 
+  it("sums cumulative metrics and averages discrete ones (series with several values per day)", () => {
+    const sums = METRIC_FIELDS.filter((f) => f.aggregation === "sum").map((f) => f.name);
+    expect(sums).toEqual([
+      "steps",
+      "distance_m",
+      "flights",
+      "active_kcal",
+      "resting_kcal",
+      "exercise_min",
+      "stand_min",
+      "daylight_min",
+      "mindful_min",
+    ]);
+    for (const f of METRIC_FIELDS) expect(["sum", "mean"], f.name).toContain(f.aggregation);
+    // Fractions are converted per value before averaging; a summed fraction would make no sense.
+    for (const f of METRIC_FIELDS) if ("fraction" in f && f.fraction) expect(f.aggregation, f.name).toBe("mean");
+  });
+
   it("validates type and range", () => {
     const steps = METRIC_FIELDS.find((f) => f.name === "steps")!;
     const hr = METRIC_FIELDS.find((f) => f.name === "resting_hr")!;

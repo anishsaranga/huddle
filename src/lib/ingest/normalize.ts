@@ -1,13 +1,15 @@
 /**
  * Second ingest step: everything that needs the user's timezone. Resolves the
- * timezone, enforces the date window, turns hr_hourly timestamps into local
- * hours, parses and cleans sleep segments, and groups them into nights.
+ * timezone, pivots a `series` payload into days (./series.ts), enforces the
+ * date window, turns hr_hourly timestamps into local hours, parses and
+ * cleans sleep segments, and groups them into nights.
  */
 
 import type { MetricName } from "@/lib/health/fields";
 import { dict } from "@/lib/ingest/dict";
-import type { DayInput, HrRowInput, Issue, ParsedPayload } from "@/lib/ingest/schema";
+import type { DayInput, HrRowInput, Issue, ParsedPayload, PayloadMeta, PayloadShape } from "@/lib/ingest/schema";
 import { MAX_ISSUES } from "@/lib/ingest/schema";
+import { pivotSeries, type SeriesStats } from "@/lib/ingest/series";
 import { buildNights, normalizeStage, type Night, type Segment } from "@/lib/ingest/sleep-merge";
 import type { SleepStage } from "@/lib/ingest/types";
 import { addDays, isValidTimezone, localDateOf, localHourOf, parseTimestamp, todayIn } from "@/lib/tz";
@@ -31,6 +33,10 @@ export type NormalizedDay = {
 export type TzSource = "payload" | "profile" | "default";
 
 export type NormalizedIngest = {
+  shape: PayloadShape;
+  meta?: PayloadMeta;
+  /** Pivot statistics, for the series shape only. */
+  series?: SeriesStats;
   tz: string;
   tzSource: TzSource;
   tzIgnored?: string;
@@ -133,14 +139,33 @@ export function normalizeIngest(payload: ParsedPayload, ctx: NormalizeContext = 
   const { today, min, max } = dateWindow(tz, now);
   const issues: Issue[] = [];
 
-  const future = [...new Set(payload.days.map((d) => d.date).filter((d) => d > max))].sort();
+  let inputDays = payload.days;
+  let series: SeriesStats | undefined;
+  const hrDropped = dict<number>();
+  if (payload.series) {
+    const w = payload.series.window;
+    if (w && w.to > max) {
+      issues.push({ path: ["window", "to"], message: `window.to ${w.to} is after ${max} (today+1 in ${tz})` });
+    }
+    if (w && w.from < min) {
+      issues.push({ path: ["window", "from"], message: `window.from ${w.from} is before ${min} (${MAX_PAST_DAYS} days ago in ${tz})` });
+    }
+    if (issues.length) return { ok: false, issues, tz };
+    const pivot = pivotSeries(payload.series, tz, today);
+    if (!pivot.ok) return { ok: false, issues: pivot.issues.slice(0, MAX_ISSUES), tz };
+    inputDays = pivot.days;
+    series = pivot.stats;
+    for (const [k, v] of Object.entries(pivot.stats.hrDropped)) bump(hrDropped, k, v);
+  }
+
+  const future = [...new Set(inputDays.map((d) => d.date).filter((d) => d > max))].sort();
   if (future.length) {
     issues.push({
       path: ["date"],
       message: `dates after ${max} (today+1 in ${tz}) are not accepted: ${future.join(", ")}`,
     });
   }
-  const old = [...new Set(payload.days.map((d) => d.date).filter((d) => d < min))].sort();
+  const old = [...new Set(inputDays.map((d) => d.date).filter((d) => d < min))].sort();
   if (old.length) {
     issues.push({
       path: ["date"],
@@ -149,8 +174,7 @@ export function normalizeIngest(payload: ParsedPayload, ctx: NormalizeContext = 
   }
   if (issues.length) return { ok: false, issues, tz };
 
-  const { merged, duplicates } = mergeDays(payload.days);
-  const hrDropped = dict<number>();
+  const { merged, duplicates } = mergeDays(inputDays);
   const days: NormalizedDay[] = merged.map((d) => ({
     date: d.date,
     metrics: d.metrics,
@@ -201,6 +225,9 @@ export function normalizeIngest(payload: ParsedPayload, ctx: NormalizeContext = 
   return {
     ok: true,
     value: {
+      shape: payload.shape,
+      meta: payload.meta,
+      series,
       tz,
       tzSource,
       tzIgnored,

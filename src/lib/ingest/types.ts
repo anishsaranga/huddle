@@ -11,6 +11,8 @@ export type IngestAuthMethod = "bearer" | "query";
 export const SLEEP_STAGES = ["in_bed", "asleep", "awake", "core", "deep", "rem"] as const;
 export type SleepStage = (typeof SLEEP_STAGES)[number];
 
+export type IngestPayloadShape = "series" | "days" | "day" | "array";
+
 /** Inclusive range of local dates (`YYYY-MM-DD`). */
 export type DateRange = { from: string; to: string };
 
@@ -42,6 +44,8 @@ export type UnknownFieldInfo = {
  * 400 that failed validation halfway) still fit.
  */
 export type IngestSummary = {
+  /** Payload shape: one Day, an array of Days, `{ days }`, or the columnar `{ series }` window form. */
+  shape?: IngestPayloadShape;
   /** Number of distinct days in the payload. */
   days: number;
   /** Min and max `date` in the payload; null when there were no days. */
@@ -84,6 +88,18 @@ export type IngestSummary = {
   tzSource?: "payload" | "profile" | "default";
   /** A payload `tz` that wasn't a valid IANA zone (ignored). */
   tzIgnored?: string;
+  /** The payload's `meta` (series shape): primitive values only, never stored as metrics. */
+  meta?: Record<string, string | number | boolean | null>;
+  /** Series shape: the window the Shortcut looked at. */
+  window?: DateRange;
+  /** Series shape: day-group starts not at local midnight that were rounded to the nearest one (a tz mismatch). */
+  tzAdjustments?: number;
+  /** Series shape, per metric: dates with more than one row (summed or averaged; the Shortcut forgot "Group By"). */
+  multiValueDates?: Record<string, number>;
+  /** Series shape, per metric: window dates up to yesterday set to null because the series had no row for them. */
+  nullFilled?: Record<string, number>;
+  /** Series shape, per metric (and `hr`): rows dropped because their date is outside the window. */
+  outsideWindow?: Record<string, number>;
   /** Request body was gzip-compressed; `decodedBytes` is its decompressed size. */
   gzip?: boolean;
   decodedBytes?: number;

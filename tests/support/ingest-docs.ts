@@ -5,8 +5,8 @@ const num = (n: number) => n.toLocaleString("en-US");
 /** The metric table in docs/ingest-api.md, generated from src/lib/health/fields.ts. */
 export function renderMetricTable(): string {
   const lines = [
-    "| Key | What | Unit | Type | Valid range | Notes |",
-    "| --- | --- | --- | --- | --- | --- |",
+    "| Key | What | Unit | Type | Valid range | Several values for a day (series) | Notes |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const f of METRIC_FIELDS as readonly MetricFieldDef[]) {
     const notes = [
@@ -15,7 +15,8 @@ export function renderMetricTable(): string {
     ]
       .filter(Boolean)
       .join("; ");
-    lines.push(`| \`${f.name}\` | ${f.label} | ${f.unit} | ${f.type} | ${num(f.min)} to ${num(f.max)} | ${notes} |`);
+    const several = f.aggregation === "sum" ? "summed" : "averaged";
+    lines.push(`| \`${f.name}\` | ${f.label} | ${f.unit} | ${f.type} | ${num(f.min)} to ${num(f.max)} | ${several} | ${notes} |`);
   }
   return lines.join("\n");
 }

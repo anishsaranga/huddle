@@ -128,10 +128,13 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
 - Payload reference, status codes and examples: `docs/ingest-api.md` (its metric table is checked against
   `fields.ts` by `tests/unit/ingest-docs.test.ts`).
 - Pipeline: `src/lib/ingest/handler.ts` (IP limit -> key auth -> key limit -> body -> JSON -> `schema.ts` (zod shapes,
-  numeric coercion, columns) -> `normalize.ts` (timezone, date window, hr hours, sleep segments) -> `upsert.ts` (one
-  transaction, per-user advisory lock) -> `onDataIngested` in `src/lib/scores/hooks.ts`). Sleep sessions/nights are pure
-  functions in `sleep-merge.ts`; timezone helpers in `src/lib/tz.ts`; limiter in `src/lib/ratelimit.ts` (in memory,
-  single instance).
+  numeric coercion, columns) -> `normalize.ts` (timezone, series pivot via `series.ts`, date window, hr hours, sleep
+  segments) -> `upsert.ts` (one transaction, per-user advisory lock) -> `onDataIngested` in `src/lib/scores/hooks.ts`).
+  Sleep sessions/nights are pure functions in `sleep-merge.ts`; timezone helpers in `src/lib/tz.ts`; limiter in
+  `src/lib/ratelimit.ts` (in memory, single instance).
+- Payload shapes: a Day, an array of Days, `{ days }`, and `{ series }` (the recommended Shortcut format: one grouped
+  "Find Health Samples" per metric over a `window`, pivoted into days by `src/lib/ingest/series.ts`; sent-but-missing
+  past dates become explicit nulls, today never does). Several values per day combine by `aggregation` in `fields.ts`.
 - Every authenticated request writes an `ingest_events` row and one `info` log line (`module: "ingest"`); the scrubbed
   body is logged at `debug`. 401s log only ip/reason/method.
 - The proxy matcher skips `/api/ingest` so Next doesn't buffer the body (up to 10 MB) before the route's 3 MB cap.

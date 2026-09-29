@@ -3,7 +3,7 @@
  * `ingest_events` and the fields of the per-request log line. Pure.
  */
 
-import { METRIC_NAMES } from "@/lib/health/fields";
+import { isMetricName, METRIC_NAMES } from "@/lib/health/fields";
 import { dict } from "@/lib/ingest/dict";
 import type { NormalizedIngest } from "@/lib/ingest/normalize";
 import {
@@ -13,10 +13,13 @@ import {
   HR_ROW_KEYS,
   SEGMENT_COLUMN_KEYS,
   SEGMENT_KEYS,
+  SERIES_ENTRY_KEYS,
+  SERIES_TOP_KEYS,
   TOP_KEYS,
+  WINDOW_KEYS,
 } from "@/lib/ingest/schema";
 import type { DateRange, FieldInventory, IngestSummary, JsonType, UnknownFieldInfo } from "@/lib/ingest/types";
-import { isRealDate } from "@/lib/tz";
+import { daysBetween, isRealDate } from "@/lib/tz";
 
 export function jsonType(v: unknown): JsonType {
   if (v === null) return "null";
@@ -32,8 +35,10 @@ export const MAX_UNKNOWN_FIELDS = 100;
 
 /**
  * Keys the payload carries that Huddle doesn't know, from the raw JSON (so
- * it works even when validation fails). Day-level keys are recorded by name;
- * other levels get a prefix: `top.x`, `hr_hourly.x`, `sleep_segments.x`.
+ * it works even when validation fails). Day-level keys, and unknown metric
+ * names in a `series`, are recorded by name; other levels get a prefix:
+ * `top.x`, `hr_hourly.x`, `sleep_segments.x`, and for the series shape
+ * `series.x` (inside a metric's columns), `hr.x`, `window.x`.
  */
 export function collectUnknownFields(json: unknown): Record<string, UnknownFieldInfo> {
   const out = dict<UnknownFieldInfo>();
@@ -52,9 +57,9 @@ export function collectUnknownFields(json: unknown): Record<string, UnknownField
   const scan = (obj: Record<string, unknown>, known: ReadonlySet<string>, prefix: string) => {
     for (const [k, v] of Object.entries(obj)) if (!known.has(k)) note(prefix + k.slice(0, 100), v);
   };
-  const scanHr = (v: unknown) => {
-    if (Array.isArray(v)) for (const row of v) if (isObj(row)) scan(row, HR_ROW_KEYS, "hr_hourly.");
-    if (isObj(v)) scan(v, HR_COLUMN_KEYS, "hr_hourly.");
+  const scanHr = (v: unknown, prefix = "hr_hourly.") => {
+    if (Array.isArray(v)) for (const row of v) if (isObj(row)) scan(row, HR_ROW_KEYS, prefix);
+    if (isObj(v)) scan(v, HR_COLUMN_KEYS, prefix);
   };
   const scanSegments = (v: unknown) => {
     if (Array.isArray(v)) for (const s of v) if (isObj(s)) scan(s, SEGMENT_KEYS, "sleep_segments.");
@@ -68,7 +73,19 @@ export function collectUnknownFields(json: unknown): Record<string, UnknownField
   };
 
   const shape = detectShape(json);
-  if (shape === "object") {
+  if (shape === "series") {
+    const top = json as Record<string, unknown>;
+    scan(top, SERIES_TOP_KEYS, "top.");
+    if (isObj(top.series)) {
+      for (const [name, entry] of Object.entries(top.series)) {
+        if (!isMetricName(name)) note(name.slice(0, 100), entry);
+        else if (isObj(entry)) scan(entry, SERIES_ENTRY_KEYS, "series.");
+      }
+    }
+    if (isObj(top.window)) scan(top.window, WINDOW_KEYS, "window.");
+    scanHr(top.hr, "hr.");
+    scanSegments(top.sleep_segments);
+  } else if (shape === "days") {
     const top = json as Record<string, unknown>;
     scan(top, TOP_KEYS, "top.");
     if (Array.isArray(top.days)) top.days.forEach(scanDay);
@@ -122,8 +139,19 @@ export function fieldInventory(days: readonly { date: string; metrics: Record<st
  */
 export function partialSummary(json: unknown, unknownFields: Record<string, UnknownFieldInfo>): IngestSummary {
   const shape = detectShape(json);
+  if (shape === "series") {
+    const w = (json as Record<string, unknown>).window;
+    const valid = isObj(w) && typeof w.from === "string" && typeof w.to === "string" && isRealDate(w.from) && isRealDate(w.to) && w.from <= w.to;
+    const summary: IngestSummary = {
+      shape,
+      days: valid ? daysBetween(w.from as string, w.to as string) + 1 : 0,
+      dateRange: valid ? { from: w.from as string, to: w.to as string } : null,
+    };
+    if (Object.keys(unknownFields).length) summary.unknownFields = unknownFields;
+    return summary;
+  }
   const rawDays: unknown[] =
-    shape === "object"
+    shape === "days"
       ? Array.isArray((json as Record<string, unknown>).days)
         ? ((json as Record<string, unknown>).days as unknown[])
         : []
@@ -136,6 +164,7 @@ export function partialSummary(json: unknown, unknownFields: Record<string, Unkn
     .map((d) => (isObj(d) && typeof d.date === "string" && isRealDate(d.date) ? d.date : null))
     .filter((d): d is string => d !== null);
   const summary: IngestSummary = { days: rawDays.length, dateRange: dateRangeOf(dates) };
+  if (shape) summary.shape = shape;
   if (Object.keys(unknownFields).length) summary.unknownFields = unknownFields;
   return summary;
 }
@@ -153,6 +182,7 @@ export type SummaryExtras = {
 export function buildSummary(n: NormalizedIngest, extras: SummaryExtras): IngestSummary {
   const hrDays = n.days.filter((d) => d.hrHourly !== undefined);
   const summary: IngestSummary = {
+    shape: n.shape,
     days: n.days.length,
     dateRange: dateRangeOf(n.days.map((d) => d.date)),
     fields: fieldInventory(n.days),
@@ -168,6 +198,14 @@ export function buildSummary(n: NormalizedIngest, extras: SummaryExtras): Ingest
     tzSource: n.tzSource,
     gzip: extras.gzip,
   };
+  if (n.meta) summary.meta = n.meta;
+  if (n.series) {
+    if (n.series.window) summary.window = n.series.window;
+    summary.tzAdjustments = n.series.tzAdjustments;
+    if (Object.keys(n.series.multiValueDates).length) summary.multiValueDates = n.series.multiValueDates;
+    if (Object.keys(n.series.nullFilled).length) summary.nullFilled = n.series.nullFilled;
+    if (Object.keys(n.series.outsideWindow).length) summary.outsideWindow = n.series.outsideWindow;
+  }
   if (n.duplicateDates.length) summary.duplicateDates = n.duplicateDates;
   if (Object.keys(n.hrDropped).length) summary.hrHourlyDropped = n.hrDropped;
   if (Object.keys(n.unknownStages).length) summary.unknownStages = n.unknownStages;

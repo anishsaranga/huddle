@@ -129,7 +129,7 @@ describe("buildSummary", () => {
 
   it("partialSummary uses whatever dates look valid", () => {
     const s = partialSummary({ days: [{ date: "2026-09-28" }, { date: "bad" }, { date: "2026-09-20", steps: "x" }, 7] }, {});
-    expect(s).toEqual({ days: 4, dateRange: { from: "2026-09-20", to: "2026-09-28" } });
+    expect(s).toEqual({ shape: "days", days: 4, dateRange: { from: "2026-09-20", to: "2026-09-28" } });
     expect(partialSummary("x", {})).toEqual({ days: 0, dateRange: null });
   });
 });

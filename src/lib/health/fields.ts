@@ -17,6 +17,7 @@
 
 export type MetricCategory = "activity" | "heart" | "vitals" | "body";
 export type MetricType = "int" | "float";
+export type MetricAggregation = "sum" | "mean";
 
 export type MetricFieldDef = {
   /** Ingest payload key and Drizzle property (snake_case). */
@@ -37,31 +38,37 @@ export type MetricFieldDef = {
    * ingest, a value <= 1 is multiplied by 100 when the result is in range.
    */
   readonly fraction?: boolean;
+  /**
+   * How several values for one day combine (the `series` ingest shape, when a
+   * Shortcut didn't group its samples by day): cumulative totals are summed,
+   * discrete measurements averaged.
+   */
+  readonly aggregation: MetricAggregation;
 };
 
 export const METRIC_FIELDS = [
   // Activity
-  { name: "steps", column: "steps", unit: "count", type: "int", min: 0, max: 200_000, label: "Steps", category: "activity" },
-  { name: "distance_m", column: "distance_m", unit: "m", type: "float", min: 0, max: 500_000, label: "Walking + running distance", category: "activity" },
-  { name: "flights", column: "flights", unit: "count", type: "int", min: 0, max: 2_000, label: "Flights climbed", category: "activity" },
-  { name: "active_kcal", column: "active_kcal", unit: "kcal", type: "float", min: 0, max: 15_000, label: "Active energy", category: "activity" },
-  { name: "resting_kcal", column: "resting_kcal", unit: "kcal", type: "float", min: 0, max: 10_000, label: "Resting energy", category: "activity" },
-  { name: "exercise_min", column: "exercise_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Exercise minutes", category: "activity" },
-  { name: "stand_min", column: "stand_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Stand minutes", category: "activity" },
-  { name: "daylight_min", column: "daylight_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Time in daylight", category: "activity" },
-  { name: "mindful_min", column: "mindful_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Mindful minutes", category: "activity" },
+  { name: "steps", column: "steps", unit: "count", type: "int", min: 0, max: 200_000, label: "Steps", aggregation: "sum", category: "activity" },
+  { name: "distance_m", column: "distance_m", unit: "m", type: "float", min: 0, max: 500_000, label: "Walking + running distance", aggregation: "sum", category: "activity" },
+  { name: "flights", column: "flights", unit: "count", type: "int", min: 0, max: 2_000, label: "Flights climbed", aggregation: "sum", category: "activity" },
+  { name: "active_kcal", column: "active_kcal", unit: "kcal", type: "float", min: 0, max: 15_000, label: "Active energy", aggregation: "sum", category: "activity" },
+  { name: "resting_kcal", column: "resting_kcal", unit: "kcal", type: "float", min: 0, max: 10_000, label: "Resting energy", aggregation: "sum", category: "activity" },
+  { name: "exercise_min", column: "exercise_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Exercise minutes", aggregation: "sum", category: "activity" },
+  { name: "stand_min", column: "stand_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Stand minutes", aggregation: "sum", category: "activity" },
+  { name: "daylight_min", column: "daylight_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Time in daylight", aggregation: "sum", category: "activity" },
+  { name: "mindful_min", column: "mindful_min", unit: "min", type: "float", min: 0, max: 1_440, label: "Mindful minutes", aggregation: "sum", category: "activity" },
   // Heart
-  { name: "resting_hr", column: "resting_hr", unit: "bpm", type: "float", min: 20, max: 200, label: "Resting heart rate", category: "heart" },
-  { name: "walking_hr_avg", column: "walking_hr_avg", unit: "bpm", type: "float", min: 30, max: 230, label: "Walking heart rate average", category: "heart" },
-  { name: "hrv_sdnn_ms", column: "hrv_sdnn_ms", unit: "ms", type: "float", min: 1, max: 500, label: "Heart rate variability (SDNN)", category: "heart" },
-  { name: "vo2max", column: "vo2max", unit: "mL/kg/min", type: "float", min: 5, max: 100, label: "VO2 max", category: "heart" },
+  { name: "resting_hr", column: "resting_hr", unit: "bpm", type: "float", min: 20, max: 200, label: "Resting heart rate", aggregation: "mean", category: "heart" },
+  { name: "walking_hr_avg", column: "walking_hr_avg", unit: "bpm", type: "float", min: 30, max: 230, label: "Walking heart rate average", aggregation: "mean", category: "heart" },
+  { name: "hrv_sdnn_ms", column: "hrv_sdnn_ms", unit: "ms", type: "float", min: 1, max: 500, label: "Heart rate variability (SDNN)", aggregation: "mean", category: "heart" },
+  { name: "vo2max", column: "vo2max", unit: "mL/kg/min", type: "float", min: 5, max: 100, label: "VO2 max", aggregation: "mean", category: "heart" },
   // Vitals
-  { name: "spo2_pct", column: "spo2_pct", unit: "%", type: "float", min: 50, max: 100, label: "Blood oxygen", category: "vitals", fraction: true },
-  { name: "resp_rate", column: "resp_rate", unit: "breaths/min", type: "float", min: 4, max: 60, label: "Respiratory rate", category: "vitals" },
-  { name: "wrist_temp_c", column: "wrist_temp_c", unit: "°C", type: "float", min: 25, max: 45, label: "Sleeping wrist temperature", category: "vitals" },
+  { name: "spo2_pct", column: "spo2_pct", unit: "%", type: "float", min: 50, max: 100, label: "Blood oxygen", aggregation: "mean", category: "vitals", fraction: true },
+  { name: "resp_rate", column: "resp_rate", unit: "breaths/min", type: "float", min: 4, max: 60, label: "Respiratory rate", aggregation: "mean", category: "vitals" },
+  { name: "wrist_temp_c", column: "wrist_temp_c", unit: "°C", type: "float", min: 25, max: 45, label: "Sleeping wrist temperature", aggregation: "mean", category: "vitals" },
   // Body
-  { name: "weight_kg", column: "weight_kg", unit: "kg", type: "float", min: 20, max: 400, label: "Weight", category: "body" },
-  { name: "body_fat_pct", column: "body_fat_pct", unit: "%", type: "float", min: 1, max: 80, label: "Body fat", category: "body", fraction: true },
+  { name: "weight_kg", column: "weight_kg", unit: "kg", type: "float", min: 20, max: 400, label: "Weight", aggregation: "mean", category: "body" },
+  { name: "body_fat_pct", column: "body_fat_pct", unit: "%", type: "float", min: 1, max: 80, label: "Body fat", aggregation: "mean", category: "body", fraction: true },
 ] as const satisfies readonly MetricFieldDef[];
 
 export type MetricField = (typeof METRIC_FIELDS)[number];

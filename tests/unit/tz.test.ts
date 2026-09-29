@@ -5,6 +5,7 @@ import {
   isRealDate,
   localDateOf,
   localHourOf,
+  parseLocalDate,
   parseTimestamp,
   todayIn,
   zonedTimeToUtc,
@@ -93,4 +94,24 @@ describe("parseTimestamp", () => {
   ])("rejects %j", (input) => {
     expect(parseTimestamp(input, TZ)).toBeNull();
   });
+});
+
+describe("parseLocalDate", () => {
+  it.each([
+    ["2026-09-28", "2026-09-28"],
+    [" 2026-09-28 ", "2026-09-28"],
+    ["Sep 28, 2026", "2026-09-28"],
+    ["September 8 2026", "2026-09-08"],
+    ["28 Sep 2026", "2026-09-28"],
+    ["28 Sept. 2026", "2026-09-28"],
+  ])("%j -> %j", (input, want) => {
+    expect(parseLocalDate(input)).toBe(want);
+  });
+
+  it.each(["2026-02-30", "Sep 31, 2026", "Foo 28, 2026", "constructor 28, 2026", "Sep 28, 2026 at 12:00 AM", "yesterday"])(
+    "rejects %j",
+    (input) => {
+      expect(parseLocalDate(input)).toBeNull();
+    },
+  );
 });

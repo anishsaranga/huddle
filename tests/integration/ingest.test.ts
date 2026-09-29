@@ -2,7 +2,7 @@ import { gzipSync } from "node:zlib";
 import { and, asc, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/db";
-import { apiKeys, dailyMetrics, hrHourly, ingestEvents, sleepNights, sleepSegments, users } from "@/db/schema";
+import { apiKeys, dailyMetrics, dailyScores, hrHourly, ingestEvents, sleepNights, sleepSegments, users } from "@/db/schema";
 import type { Db } from "@/lib/admin/db";
 import { createKeyForUser, revokeKeysForUser } from "@/lib/apikey";
 import { MAX_BODY_BYTES } from "@/lib/ingest/body";
@@ -651,5 +651,132 @@ describe("failures and hooks", () => {
     await post({ date: today() }, { key });
     const [k] = await db.select().from(apiKeys).where(eq(apiKeys.userId, user.id));
     expect(k.lastUsedAt).not.toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Series shape                                                         */
+/* ------------------------------------------------------------------ */
+
+describe("series shape", () => {
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  /** A date as Shortcuts renders a Date in text: `Sep 28, 2026 at 12:00 AM` (narrow no-break space before AM/PM). */
+  const en = (date: string, time = "12:00 AM") => {
+    const [y, m, d] = date.split("-").map(Number);
+    return `${MONTHS[m - 1]} ${d}, ${y} at ${time}`;
+  };
+  const col = (xs: (string | number)[]) => xs.join("\n");
+  const scoresOf = (userId: string) =>
+    db.select().from(dailyScores).where(eq(dailyScores.userId, userId)).orderBy(asc(dailyScores.localDate));
+  const pick = (rows: Awaited<ReturnType<typeof metricsOf>>) =>
+    rows.map((r) => ({ d: r.localDate, steps: r.steps, kcal: r.active_kcal, rhr: r.resting_hr, hrv: r.hrv_sdnn_ms, vo2: r.vo2max }));
+
+  /** What a Shortcut builds from one grouped "Find Health Samples" per metric over the last days. */
+  function shortcutPayload(t: string) {
+    const [d0, d1, d2, d3] = [addDays(t, -4), addDays(t, -3), addDays(t, -2), addDays(t, -1)];
+    return {
+      window: { from: d1, to: t },
+      series: {
+        // The rolling query's first group (d0) is a partial day, outside the window.
+        steps: { starts: col([d0, d1, d2, d3, t].map((d) => en(d))), values: col([300, 7412, 9020, 8311, 2104]) + "\n" },
+        // No active energy on d2 (e.g. the watch was charging): d2 becomes null.
+        active_kcal: { starts: col([d1, d3].map((d) => en(d))), values: col(["412.5", "388"]) },
+        resting_hr: { starts: col([d1, d2, d3].map((d) => en(d))), values: col([52, 53, 51]) },
+        // Sent but empty: Health had no HRV at all in the window.
+        hrv_sdnn_ms: { starts: "", values: "" },
+        cycling_km: { starts: en(d1), values: "12" },
+      },
+      hr: {
+        starts: col([en(d3, "11:00 PM"), en(t), en(t, "1:00 AM")]),
+        avg: col([58, 55, 54]),
+        min: col([52, 50, 49]),
+        max: col([66, 61, 60]),
+      },
+      sleep_segments: {
+        stages: col(["In Bed", "Core", "Deep", "REM", "Awake"]),
+        starts: col([en(d3, "10:51 PM"), en(d3, "11:04 PM"), en(t, "12:31 AM"), en(t, "1:12 AM"), en(t, "6:40 AM")]),
+        ends: col([en(t, "6:58 AM"), en(t, "12:31 AM"), en(t, "1:12 AM"), en(t, "2:03 AM"), en(t, "6:52 AM")]),
+        sources: col(["Ada’s iPhone", "Apple Watch", "Apple Watch", "Apple Watch", "Apple Watch"]),
+      },
+      meta: { shortcut_version: "1", device: "iPhone 15" },
+    };
+  }
+
+  it("pivots a Shortcut's 3-day series into days: explicit nulls for past dates, today untouched; idempotent; scores computed", async () => {
+    const { user, key } = await makeUser();
+    const t = today();
+    const [d1, d2, d3] = [addDays(t, -3), addDays(t, -2), addDays(t, -1)];
+    // Earlier syncs: values the series must clear (d2 active energy, HRV) or leave alone (today, vo2max).
+    await post({ days: [{ date: d2, active_kcal: 999, hrv_sdnn_ms: 60, vo2max: 40 }, { date: t, active_kcal: 150, resting_hr: 55, hrv_sdnn_ms: 61 }] }, { key });
+
+    const payload = shortcutPayload(t);
+    const res = await post(payload, { key });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, days_written: 4, date_range: { from: d1, to: t }, unknown_fields: ["cycling_km"] });
+
+    const expected = [
+      { d: d1, steps: 7412, kcal: 412.5, rhr: 52, hrv: null, vo2: null },
+      { d: d2, steps: 9020, kcal: null, rhr: 53, hrv: null, vo2: 40 },
+      { d: d3, steps: 8311, kcal: 388, rhr: 51, hrv: null, vo2: null },
+      { d: t, steps: 2104, kcal: 150, rhr: 55, hrv: 61, vo2: null },
+    ];
+    expect(pick(await metricsOf(user.id))).toEqual(expected);
+    expect((await hrOf(user.id, d3)).map((r) => r.hour)).toEqual([23]);
+    expect(await hrOf(user.id, t)).toEqual([
+      { hour: 0, avg: 55, min: 50, max: 61 },
+      { hour: 1, avg: 54, min: 49, max: 60 },
+    ]);
+    const [night] = await db.select().from(sleepNights).where(eq(sleepNights.userId, user.id));
+    expect(night).toMatchObject({ wakeDate: t, chosenSource: "Apple Watch", hasStages: true });
+
+    const ev = (await eventsOf(user.id)).at(-1)!;
+    expect(ev.summary).toMatchObject({
+      shape: "series",
+      meta: { shortcut_version: "1", device: "iPhone 15" },
+      window: { from: d1, to: t },
+      days: 4,
+      tzAdjustments: 0,
+      nullFilled: { active_kcal: 1, hrv_sdnn_ms: 3 },
+      outsideWindow: { steps: 1 },
+      unknownFields: { cycling_km: { count: 1, types: ["object"] } },
+      hrHourlyDays: 2,
+      nights: [t],
+      rowsInserted: 2,
+      rowsUpdated: 2,
+    });
+    expect(logRecords().find((r) => r.msg === "ingest ok" && r.shape === "series")).toMatchObject({
+      nullFilled: { active_kcal: 1, hrv_sdnn_ms: 3 },
+      meta: { device: "iPhone 15" },
+    });
+
+    // Scores were recomputed for the affected dates.
+    const scores = await scoresOf(user.id);
+    expect(scores.map((s) => s.localDate)).toEqual(expect.arrayContaining([d1, d2, d3, t]));
+    expect(scores.find((s) => s.localDate === t)!.sleepScore).not.toBeNull();
+
+    // Re-sending the same snapshot changes nothing.
+    const before = { metrics: pick(await metricsOf(user.id)), hr: await hrOf(user.id, t), scores: scores.map((s) => [s.localDate, s.sleepScore, s.recovery, s.strain]) };
+    expect((await post(payload, { key })).status).toBe(200);
+    expect(pick(await metricsOf(user.id))).toEqual(before.metrics);
+    expect(await hrOf(user.id, t)).toEqual(before.hr);
+    expect((await scoresOf(user.id)).map((s) => [s.localDate, s.sleepScore, s.recovery, s.strain])).toEqual(before.scores);
+    expect((await eventsOf(user.id)).at(-1)!.summary).toMatchObject({ rowsInserted: 0, rowsUpdated: 4 });
+  });
+
+  it("400s a column mismatch naming the series, stores nothing, and records the shape", async () => {
+    const { user, key } = await makeUser();
+    const t = today();
+    const res = await post(
+      { window: { from: addDays(t, -2), to: t }, series: { steps: { starts: col([en(addDays(t, -1)), en(t)]), values: "100" } } },
+      { key },
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.issues).toEqual([
+      { path: ["series", "steps"], message: 'series "steps": starts and values need the same number of lines (starts: 2, values: 1)' },
+    ]);
+    expect(await metricsOf(user.id)).toHaveLength(0);
+    const [ev] = await eventsOf(user.id);
+    expect(ev).toMatchObject({ status: 400, summary: { shape: "series", days: 3, dateRange: { from: addDays(t, -2), to: t } } });
   });
 });

@@ -1,14 +1,17 @@
 /**
- * Structural validation of an ingest payload (zod). Accepts the three
- * payload shapes, coerces Shortcut-style values (numeric strings, newline
+ * Structural validation of an ingest payload (zod). Accepts the four
+ * payload shapes (a Day, an array of Days, `{ days }`, and the columnar
+ * `{ series }` window form), coerces Shortcut-style values (numeric strings, newline
  * joined columns) and range-checks every known metric from
  * src/lib/health/fields.ts. Anything that needs the user's timezone
- * (timestamps, "today") happens afterwards in ./normalize.ts.
+ * (timestamps, "today", pivoting a series into days) happens afterwards in
+ * ./normalize.ts and ./series.ts.
  */
 
 import { z } from "zod";
 import { METRIC_FIELDS, type MetricFieldDef, type MetricName } from "@/lib/health/fields";
-import { isRealDate } from "@/lib/tz";
+import type { IngestPayloadShape } from "@/lib/ingest/types";
+import { daysBetween, isRealDate } from "@/lib/tz";
 
 export const MAX_DAYS = 366;
 export const MAX_SEGMENTS = 5000;
@@ -16,6 +19,12 @@ export const MAX_SEGMENTS = 5000;
 export const MAX_HR_ROWS_PER_DAY = 48;
 /** Plausible heart rate for an hourly bucket (bpm). */
 export const HR_RANGE = { min: 20, max: 250 } as const;
+/** Rows per metric in a `series` payload (ungrouped samples over a long window can be many). */
+export const MAX_SERIES_ROWS = 20_000;
+/** Rows in a `series` payload's `hr` (hourly groups over at most MAX_DAYS days). */
+export const MAX_SERIES_HR_ROWS = MAX_DAYS * MAX_HR_ROWS_PER_DAY;
+/** `meta` entries kept in the summary. */
+export const MAX_META_KEYS = 20;
 /** Most validation issues returned / stored. */
 export const MAX_ISSUES = 50;
 
@@ -331,6 +340,9 @@ const segmentsSchema = arrayOrColumnar(z.array(segmentRow), segmentColumnar, "sl
 
 export const DAY_KEYS = new Set<string>(["date", "hr_hourly", "sleep_segments", ...METRIC_FIELDS.map((f) => f.name)]);
 export const TOP_KEYS = new Set<string>(["days", "sleep_segments", "tz"]);
+export const SERIES_TOP_KEYS = new Set<string>(["tz", "window", "series", "hr", "sleep_segments", "meta"]);
+export const SERIES_ENTRY_KEYS = new Set<string>(["starts", "values"]);
+export const WINDOW_KEYS = new Set<string>(["from", "to"]);
 export const HR_ROW_KEYS = new Set<string>(["hour", "start", "avg", "min", "max"]);
 export const HR_COLUMN_KEYS = new Set<string>(["starts", "hours", "avg", "min", "max"]);
 export const SEGMENT_KEYS = new Set<string>(["stage", "start", "end", "source"]);
@@ -356,15 +368,39 @@ export type DayInput = {
   segments: SegmentInput[];
 };
 
-export type PayloadShape = "day" | "array" | "object";
+export type PayloadShape = IngestPayloadShape;
+
+/** One metric's series: group start (timestamp or date, resolved later) and the value, row by row. */
+export type SeriesColumnInput = {
+  starts: string[];
+  /** Already coerced, fraction-converted and range-checked per value; null = empty cell. */
+  values: (number | null)[];
+};
+
+/** `meta` as recorded: primitive values only. */
+export type PayloadMeta = Record<string, string | number | boolean | null>;
+
+/** The `series` shape before pivoting (needs the timezone, so it happens in normalize). */
+export type SeriesInput = {
+  /** Inclusive local-date window the Shortcut looked at. */
+  window?: { from: string; to: string };
+  /** Known metrics that were sent (unknown names are only recorded as unknown fields). */
+  metrics: Partial<Record<MetricName, SeriesColumnInput>>;
+  /** Hourly heart-rate groups; every row has a `start`. */
+  hr: HrRowInput[];
+};
 
 export type ParsedPayload = {
   shape: PayloadShape;
+  /** Validated days (empty for the series shape until it's pivoted). */
   days: DayInput[];
   /** Top-level and per-day segments, pooled. */
   segments: SegmentInput[];
   /** Raw `tz` from the payload (validated later). */
   tz?: string;
+  /** Only for the series shape. */
+  series?: SeriesInput;
+  meta?: PayloadMeta;
 };
 
 export type ParseResult = { ok: true; payload: ParsedPayload } | { ok: false; issues: Issue[] };
@@ -374,7 +410,7 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> =>
 
 export function detectShape(json: unknown): PayloadShape | null {
   if (Array.isArray(json)) return "array";
-  if (isPlainObject(json)) return "days" in json ? "object" : "day";
+  if (isPlainObject(json)) return "series" in json ? "series" : "days" in json ? "days" : "day";
   return null;
 }
 
@@ -412,8 +448,12 @@ function toDay(raw: Record<string, unknown>, parsed: Record<string, unknown>): D
 export function parsePayload(json: unknown): ParseResult {
   const shape = detectShape(json);
   if (!shape) {
-    return { ok: false, issues: [{ path: [], message: "expected a Day object, an array of Days, or { days: [...] }" }] };
+    return {
+      ok: false,
+      issues: [{ path: [], message: "expected a Day object, an array of Days, { days: [...] } or { series: {...} }" }],
+    };
   }
+  if (shape === "series") return parseSeriesPayload(json as Record<string, unknown>);
 
   let rawDays: unknown[];
   let prefix: (string | number)[] = [];
@@ -421,7 +461,7 @@ export function parsePayload(json: unknown): ParseResult {
   let tz: string | undefined;
   const issues: Issue[] = [];
 
-  if (shape === "object") {
+  if (shape === "days") {
     const top = topSchema.safeParse(json);
     if (!top.success) {
       issues.push(...toIssues(top.error));
@@ -444,7 +484,7 @@ export function parsePayload(json: unknown): ParseResult {
   if (rawDays.length > MAX_DAYS) {
     return {
       ok: false,
-      issues: [{ path: shape === "object" ? ["days"] : [], message: `at most ${MAX_DAYS} days per request (got ${rawDays.length})` }],
+      issues: [{ path: shape === "days" ? ["days"] : [], message: `at most ${MAX_DAYS} days per request (got ${rawDays.length})` }],
     };
   }
   if (rawDays.length === 0 && topSegments.length === 0 && issues.length === 0) {
@@ -473,4 +513,143 @@ export function parsePayload(json: unknown): ParseResult {
 
   if (issues.length) return { ok: false, issues: issues.slice(0, MAX_ISSUES) };
   return { ok: true, payload: { shape, days, segments, tz } };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Series shape                                                              */
+/* ------------------------------------------------------------------------ */
+
+const windowSchema = z
+  .object({ from: dateSchema, to: dateSchema }, { error: "window must be { from, to } (YYYY-MM-DD)" })
+  .superRefine((w, ctx) => {
+    if (w.from > w.to) {
+      ctx.addIssue({ code: "custom", message: `window.from (${w.from}) is after window.to (${w.to})` });
+    } else if (daysBetween(w.from, w.to) + 1 > MAX_DAYS) {
+      ctx.addIssue({ code: "custom", message: `window spans at most ${MAX_DAYS} days (got ${daysBetween(w.from, w.to) + 1})` });
+    }
+  });
+
+const seriesTopSchema = z.object({
+  tz: z.string().max(64).optional(),
+  window: windowSchema.optional(),
+  series: z.record(z.string(), z.unknown(), { error: "series must be an object of { starts, values } columns" }),
+  hr: arrayOrColumnar(z.array(hrRow), hrColumnar, "hr", [] as HrRowInput[]).optional(),
+  sleep_segments: segmentsSchema.optional(),
+  meta: z.record(z.string(), z.unknown(), { error: "meta must be an object" }).optional(),
+});
+
+const seriesEntrySchema = z.object(
+  { starts: column, values: column },
+  { error: "expected { starts, values } (newline-joined text or arrays)" },
+);
+
+/** Primitive `meta` values only, bounded (it's recorded in every event summary). */
+function sanitizeMeta(meta: Record<string, unknown>): PayloadMeta {
+  const out: PayloadMeta = {};
+  for (const [k, v] of Object.entries(meta).slice(0, MAX_META_KEYS)) {
+    if (k === "__proto__") continue;
+    const key = k.slice(0, 64);
+    if (typeof v === "string") out[key] = v.slice(0, 200);
+    else if ((typeof v === "number" && Number.isFinite(v)) || typeof v === "boolean" || v === null) out[key] = v;
+  }
+  return out;
+}
+
+function parseSeriesEntry(field: MetricFieldDef, raw: unknown, issues: Issue[]): SeriesColumnInput | null {
+  const path = ["series", field.name];
+  const r = seriesEntrySchema.safeParse(raw);
+  if (!r.success) {
+    issues.push(...toIssues(r.error, path));
+    return null;
+  }
+  const { starts, values } = fitColumns("starts", { starts: r.data.starts, values: r.data.values });
+  if (starts.length !== values.length) {
+    issues.push({
+      path,
+      message: `series "${field.name}": starts and values need the same number of lines (starts: ${starts.length}, values: ${values.length})`,
+    });
+    return null;
+  }
+  if (starts.length > MAX_SERIES_ROWS) {
+    issues.push({ path, message: `series "${field.name}": at most ${MAX_SERIES_ROWS} rows (got ${starts.length})` });
+    return null;
+  }
+  const out: SeriesColumnInput = { starts: [], values: [] };
+  let failed = false;
+  for (let i = 0; i < starts.length; i++) {
+    const s = starts[i];
+    if (typeof s !== "string" || s.trim() === "" || s.length > 64) {
+      failed = true;
+      issues.push({ path: [...path, "starts", i], message: `expected a timestamp or date, got ${describe(s)}` });
+      continue;
+    }
+    const parsed = parseNumeric(values[i]);
+    if (!parsed.ok) {
+      failed = true;
+      issues.push({ path: [...path, "values", i], message: `expected a number, got ${describe(values[i])}` });
+      continue;
+    }
+    let value: number | null = null;
+    if (parsed.value !== null) {
+      const n = normalizeMetricValue(field, parsed.value);
+      if (typeof n === "string") {
+        failed = true;
+        issues.push({ path: [...path, "values", i], message: n });
+        continue;
+      }
+      value = n;
+    }
+    out.starts.push(s.trim());
+    out.values.push(value);
+  }
+  return failed ? null : out;
+}
+
+/**
+ * The window/series shape: one column pair per metric over a whole window
+ * (what a Shortcut gets from one "Find Health Samples ... Group By Day"),
+ * hourly heart-rate groups, and the usual sleep segment columns. Values are
+ * checked here; mapping starts to local dates happens in ./series.ts.
+ */
+function parseSeriesPayload(json: Record<string, unknown>): ParseResult {
+  const issues: Issue[] = [];
+  if ("days" in json) issues.push({ path: ["days"], message: "send either days or series, not both" });
+  const top = seriesTopSchema.safeParse(json);
+  if (!top.success) {
+    issues.push(...toIssues(top.error));
+    return { ok: false, issues: issues.slice(0, MAX_ISSUES) };
+  }
+  const { tz, window, series, hr = [], sleep_segments: segments = [], meta } = top.data;
+
+  const metrics: SeriesInput["metrics"] = {};
+  for (const f of METRIC_FIELDS as readonly MetricFieldDef[]) {
+    if (!Object.hasOwn(series, f.name)) continue;
+    const col = parseSeriesEntry(f, series[f.name], issues);
+    if (col) metrics[f.name as MetricName] = col;
+  }
+
+  if (hr.length > MAX_SERIES_HR_ROWS) {
+    issues.push({ path: ["hr"], message: `at most ${MAX_SERIES_HR_ROWS} hr rows per request (got ${hr.length})` });
+  } else if (hr.some((r) => r.start === undefined)) {
+    issues.push({ path: ["hr"], message: "hr rows need `starts` timestamps (a series spans several days, so `hours` is ambiguous)" });
+  }
+  if (segments.length > MAX_SEGMENTS) {
+    issues.push({ path: [], message: `at most ${MAX_SEGMENTS} sleep segments per request (got ${segments.length})` });
+  }
+  if (Object.keys(series).length === 0 && hr.length === 0 && segments.length === 0 && issues.length === 0) {
+    issues.push({ path: ["series"], message: "nothing to ingest: series is empty and there are no hr rows or sleep segments" });
+  }
+  if (issues.length) return { ok: false, issues: issues.slice(0, MAX_ISSUES) };
+
+  return {
+    ok: true,
+    payload: {
+      shape: "series",
+      days: [],
+      segments,
+      tz,
+      series: { window, metrics, hr },
+      meta: meta && sanitizeMeta(meta),
+    },
+  };
 }
