@@ -8,11 +8,10 @@ import { avatarUserOf, fullName } from "@/components/groups/metric";
 import type { GroupTrendBar, MemberView } from "@/components/groups/types";
 import { dateLabel, shortDate, weekdayShort } from "@/lib/dashboard/dates";
 import { memberGroup } from "@/lib/groups/access";
-import { getGroupFirstScoreDate, getGroupRecoveryTrend, getMembersToday } from "@/lib/groups/queries";
-import { groupToday, parseGroupState } from "@/lib/groups/view";
+import { getGroupFirstScoreDate, getGroupRecoveryTrend, getMembersToday, groupDateOf } from "@/lib/groups/queries";
+import { groupDateContext, groupToday, parseGroupState } from "@/lib/groups/view";
 import { getGroupBoards } from "@/lib/scores/queries";
 import { requireOnboardedUser } from "@/lib/session";
-import { todayIn } from "@/lib/tz";
 import { recoveryColor, recoveryColorOrNeutral } from "@/lib/ui/colors";
 import { formatRelative } from "@/lib/ui/format";
 
@@ -27,9 +26,10 @@ export default async function GroupPage({ params, searchParams }: PageProps<"/gr
   if (!group) notFound();
 
   const now = new Date();
-  const today = todayIn(user.timezone || "UTC", now);
+  // The group's today (its own timezone, not the viewer's) drives the Info tab, the trend and the board defaults.
+  const today = groupDateOf(group, now);
   const [membersByGroup, firstDate, trend, sp] = await Promise.all([
-    getMembersToday(db, [group.id], now),
+    getMembersToday(db, [group], now),
     getGroupFirstScoreDate(db, group.id),
     getGroupRecoveryTrend(db, group.id, today, 7),
     searchParams,
@@ -48,9 +48,9 @@ export default async function GroupPage({ params, searchParams }: PageProps<"/gr
     avatarPath: m.avatarPath,
     timezone: m.timezone,
     scores: m.scores,
-    syncedToday: m.syncedToday,
+    hasData: m.hasData,
     lastSynced: m.lastSyncAt ? formatRelative(m.lastSyncAt, now) : null,
-    todayLabel: dateLabel(m.today, m.today),
+    todayLabel: dateLabel(m.date, m.date),
   }));
   const trendBars: GroupTrendBar[] = trend.map((p) => ({
     label: p.date === today ? "TODAY" : weekdayShort(p.date),
@@ -78,7 +78,7 @@ export default async function GroupPage({ params, searchParams }: PageProps<"/gr
           people={members.map((m) => ({ id: m.userId, label: fullName(m), user: avatarUserOf(m) }))}
         />
       }
-      info={<InfoPanel members={memberViews} today={summary} trend={trendBars} trendAvg={trendAvg} viewerId={user.id} />}
+      info={<InfoPanel members={memberViews} today={summary} trend={trendBars} trendAvg={trendAvg} viewerId={user.id} dateContext={groupDateContext(today, group.timezone)} />}
       chat={<ChatPlaceholder />}
     />
   );

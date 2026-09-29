@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { boardNav, groupQuery, groupToday, isSyncedToday, parseGroupState, weekRangeLabel } from "@/lib/groups/view";
+import { boardNav, groupDateContext, groupQuery, groupToday, parseGroupState, weekRangeLabel } from "@/lib/groups/view";
 
 const TODAY = "2026-09-29"; // a Tuesday
 
 describe("groupToday", () => {
-  it("averages each score over members with a value and counts synced members", () => {
+  it("averages each score over members with a value and counts members with data for the group date", () => {
     const t = groupToday([
-      { scores: { recovery: 80, strain: 10.2, sleep: null }, syncedToday: true },
-      { scores: { recovery: 61, strain: null, sleep: 90 }, syncedToday: false },
-      { scores: { recovery: null, strain: 4.1, sleep: 70 }, syncedToday: true },
+      { scores: { recovery: 80, strain: 10.2, sleep: null }, hasData: true },
+      { scores: { recovery: 61, strain: null, sleep: 90 }, hasData: false },
+      { scores: { recovery: null, strain: 4.1, sleep: 70 }, hasData: true },
     ]);
     expect(t).toEqual({
       recovery: { value: 70.5, n: 2 },
@@ -30,18 +30,9 @@ describe("groupToday", () => {
   });
 });
 
-describe("isSyncedToday", () => {
-  const now = new Date("2026-09-29T21:30:00Z");
-  it("compares local dates in the member's timezone", () => {
-    const sync = new Date("2026-09-29T11:00:00Z");
-    expect(isSyncedToday(sync, "America/New_York", now)).toBe(true); // both Sep 29 in NY
-    expect(isSyncedToday(sync, "Asia/Kolkata", now)).toBe(false); // now is Sep 30 03:00 in Kolkata
-    // Just after local midnight in Kolkata: synced "today".
-    expect(isSyncedToday(new Date("2026-09-29T18:45:00Z"), "Asia/Kolkata", now)).toBe(true);
-  });
-  it("never synced (or a clock in the future) is false", () => {
-    expect(isSyncedToday(null, "UTC", now)).toBe(false);
-    expect(isSyncedToday(new Date("2026-09-29T23:00:00Z"), "UTC", now)).toBe(false);
+describe("groupDateContext", () => {
+  it("labels the group date and timezone", () => {
+    expect(groupDateContext(TODAY, "Europe/Berlin")).toBe("TODAY · SEP 29 · EUROPE/BERLIN");
   });
 });
 

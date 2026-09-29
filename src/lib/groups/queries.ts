@@ -1,20 +1,22 @@
 /**
- * Community tab data: which groups a user is in, each member's scores for
- * their own "today", the group's today averages, and the group's daily
+ * Community tab data: which groups a user is in, each member's scores for the
+ * group's "today", the group's today averages, and the group's daily
  * recovery trend. Plain functions over a Drizzle handle; a fixed number of
  * grouped queries however many groups or members (no per-member loops).
  *
- * Timezones: "today" is per member (`todayIn(member.timezone)`), so a friend
- * in Kolkata is already on tomorrow's date while one in New York isn't.
- * Trend dates, like the leaderboards, are each member's own local dates.
+ * Timezones: a group's "today" is the current date in `groups.timezone` (the
+ * group date). For a group date D every member's row is their own data for
+ * local_date = D: the same calendar-day label, whatever time it is where they
+ * live (a friend in Kolkata who is already on tomorrow still counts for D).
+ * Trend dates and the leaderboards use the same convention.
  */
 
 import { and, asc, between, eq, inArray, isNull, min, sql } from "drizzle-orm";
-import { dailyScores, groupMembers, groups, users, type AvatarConfig, type AvatarKind } from "@/db/schema";
+import { dailyMetrics, dailyScores, groupMembers, groups, users, type AvatarConfig, type AvatarKind } from "@/db/schema";
 import type { Executor } from "@/lib/admin/db";
 import { getSyncSummaries } from "@/lib/sync-status";
 import { addDays, todayIn } from "@/lib/tz";
-import { groupToday, isSyncedToday, type GroupToday, type TodayScores } from "./view";
+import { groupToday, type GroupToday, type TodayScores } from "./view";
 
 export type GroupRef = { id: string; name: string; timezone: string };
 
@@ -26,17 +28,27 @@ export type GroupMember = {
   avatarConfig: AvatarConfig | null;
   avatarPath: string | null;
   timezone: string;
-  /** The member's local date right now. */
-  today: string;
-  /** Scores on the member's own today (nulls when there's no row / no score yet). */
+  /** The group date this row is for (the member's own local_date = this). */
+  date: string;
+  /** Scores on the member's local_date = group date (nulls when there's no row / no score yet). */
   scores: TodayScores;
   /** Most recent successful sync; null = never. */
   lastSyncAt: Date | null;
-  /** A successful sync on the member's own local today. */
-  syncedToday: boolean;
+  /** Has a daily_metrics or daily_scores row for the group date. */
+  hasData: boolean;
 };
 
-export type GroupWithToday = GroupRef & { members: GroupMember[]; today: GroupToday };
+export type GroupWithToday = GroupRef & {
+  /** The group's today: the current date in the group's timezone. */
+  date: string;
+  members: GroupMember[];
+  today: GroupToday;
+};
+
+/** The group's "today": the current date in its timezone (UTC if blank). */
+export function groupDateOf(group: Pick<GroupRef, "timezone">, now: Date = new Date()): string {
+  return todayIn(group.timezone || "UTC", now);
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -61,17 +73,20 @@ export async function getMemberGroup(db: Executor, groupId: string, userId: stri
 }
 
 /**
- * Active members of each group with their today scores and sync state:
- * one members query, one scores query (all members' todays at once) and the
- * two grouped sync-summary queries. Members are ordered by join time, then name.
+ * Active members of each group with their scores and data flag for the
+ * group's date (today in the group's timezone; see the file header): one
+ * members query, one scores query and one daily-metrics query (all members
+ * and dates at once) plus the two grouped sync-summary queries. Members are
+ * ordered by join time, then name.
  */
 export async function getMembersToday(
   db: Executor,
-  groupIds: string[],
+  groupList: readonly GroupRef[],
   now: Date = new Date(),
 ): Promise<Map<string, GroupMember[]>> {
-  const out = new Map<string, GroupMember[]>(groupIds.map((id) => [id, []]));
-  if (groupIds.length === 0) return out;
+  const out = new Map<string, GroupMember[]>(groupList.map((g) => [g.id, []]));
+  if (groupList.length === 0) return out;
+  const dateOf = new Map(groupList.map((g) => [g.id, groupDateOf(g, now)]));
 
   const rows = await db
     .select({
@@ -86,20 +101,15 @@ export async function getMembersToday(
     })
     .from(groupMembers)
     .innerJoin(users, eq(users.id, groupMembers.userId))
-    .where(and(inArray(groupMembers.groupId, groupIds), isNull(users.deactivatedAt)))
+    .where(and(inArray(groupMembers.groupId, [...dateOf.keys()]), isNull(users.deactivatedAt)))
     .orderBy(asc(groupMembers.joinedAt), asc(users.displayName), asc(users.id));
   if (rows.length === 0) return out;
 
-  const people = new Map<string, { tz: string; today: string }>();
-  for (const r of rows) {
-    if (people.has(r.userId)) continue;
-    const tz = r.timezone || "UTC";
-    people.set(r.userId, { tz, today: todayIn(tz, now) });
-  }
-  const ids = [...people.keys()];
-  const todays = [...new Set([...people.values()].map((p) => p.today))];
+  const ids = [...new Set(rows.map((r) => r.userId))];
+  const dates = [...new Set(dateOf.values())];
+  const key = (userId: string, date: string) => `${userId}|${date}`;
 
-  const [scoreRows, syncs] = await Promise.all([
+  const [scoreRows, metricRows, syncs] = await Promise.all([
     db
       .select({
         userId: dailyScores.userId,
@@ -109,20 +119,24 @@ export async function getMembersToday(
         sleep: dailyScores.sleepScore,
       })
       .from(dailyScores)
-      .where(and(inArray(dailyScores.userId, ids), inArray(dailyScores.localDate, todays))),
+      .where(and(inArray(dailyScores.userId, ids), inArray(dailyScores.localDate, dates))),
+    db
+      .select({ userId: dailyMetrics.userId, date: dailyMetrics.localDate })
+      .from(dailyMetrics)
+      .where(and(inArray(dailyMetrics.userId, ids), inArray(dailyMetrics.localDate, dates))),
     getSyncSummaries(db, ids),
   ]);
 
   const scores = new Map<string, TodayScores>();
+  const withData = new Set<string>();
   for (const s of scoreRows) {
-    // Only the row for the member's own today (another member's today may be a different date).
-    if (people.get(s.userId)?.today !== s.date) continue;
-    scores.set(s.userId, { recovery: s.recovery, strain: s.strain, sleep: s.sleep });
+    scores.set(key(s.userId, s.date), { recovery: s.recovery, strain: s.strain, sleep: s.sleep });
+    withData.add(key(s.userId, s.date));
   }
+  for (const m of metricRows) withData.add(key(m.userId, m.date));
 
   for (const r of rows) {
-    const p = people.get(r.userId)!;
-    const lastSyncAt = syncs.get(r.userId)?.lastSyncAt ?? null;
+    const date = dateOf.get(r.groupId)!;
     out.get(r.groupId)!.push({
       userId: r.userId,
       username: r.username,
@@ -130,17 +144,17 @@ export async function getMembersToday(
       avatarKind: r.avatarKind,
       avatarConfig: r.avatarConfig,
       avatarPath: r.avatarPath,
-      timezone: p.tz,
-      today: p.today,
-      scores: scores.get(r.userId) ?? { recovery: null, strain: null, sleep: null },
-      lastSyncAt,
-      syncedToday: isSyncedToday(lastSyncAt, p.tz, now),
+      timezone: r.timezone || "UTC",
+      date,
+      scores: scores.get(key(r.userId, date)) ?? { recovery: null, strain: null, sleep: null },
+      lastSyncAt: syncs.get(r.userId)?.lastSyncAt ?? null,
+      hasData: withData.has(key(r.userId, date)),
     });
   }
   return out;
 }
 
-/** Groups the user belongs to (oldest membership first), each with members and today's averages. */
+/** Groups the user belongs to (oldest membership first), each with members and the group's today averages. */
 export async function listMemberGroups(db: Executor, userId: string, now: Date = new Date()): Promise<GroupWithToday[]> {
   const mine = await db
     .select({ id: groups.id, name: groups.name, timezone: groups.timezone })
@@ -149,10 +163,10 @@ export async function listMemberGroups(db: Executor, userId: string, now: Date =
     .where(eq(groupMembers.userId, userId))
     .orderBy(asc(groupMembers.joinedAt), asc(groups.name));
   if (mine.length === 0) return [];
-  const members = await getMembersToday(db, mine.map((g) => g.id), now);
+  const members = await getMembersToday(db, mine, now);
   return mine.map((g) => {
     const list = members.get(g.id) ?? [];
-    return { ...g, members: list, today: groupToday(list) };
+    return { ...g, date: groupDateOf(g, now), members: list, today: groupToday(list) };
   });
 }
 

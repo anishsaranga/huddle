@@ -5,10 +5,10 @@ import type { BoardMember } from "@/lib/scores/queries";
 export type MemberView = BoardMember & {
   timezone: string;
   scores: TodayScores;
-  syncedToday: boolean;
+  hasData: boolean;
   /** "3 h ago" / null = never synced. */
   lastSynced: string | null;
-  /** The member's own today, e.g. "TUE · SEP 29". */
+  /** The group date the scores are for, e.g. "TUE · SEP 29". */
   todayLabel: string;
 };
 

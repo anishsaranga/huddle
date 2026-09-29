@@ -41,6 +41,8 @@ test("community: group list, Info, a strain podium, Day/Week in the URL, and 404
 
   // Info: every member is listed with today's scores.
   const info = page.getByRole("tabpanel", { name: "Info" });
+  // The group date context: the group's today in the group's timezone.
+  await expect(info.getByTestId("group-date-context")).toHaveText(new RegExp(`^TODAY · [A-Z]{3} \\d{1,2} · ${tz.toUpperCase()}$`));
   for (const p of people) await expect(info.getByRole("button", { name: new RegExp(`^${p.name}\\. Today: `) })).toBeVisible();
   await info.getByRole("button", { name: /^Ben Ortiz\./ }).click();
   await expect(page.getByRole("dialog", { name: "Ben Ortiz" })).toBeVisible();

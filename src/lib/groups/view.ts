@@ -1,12 +1,13 @@
 /**
- * Pure view helpers for the Community tab: today averages, sync flags, the
- * group page's URL state (`?tab=&period=&date=`) and leaderboard date
- * navigation. No clock reads: callers pass "now" / "today".
+ * Pure view helpers for the Community tab: today averages, the group page's
+ * URL state (`?tab=&period=&date=`) and leaderboard date navigation. No clock
+ * reads: callers pass the group's date (today in the group's timezone) as
+ * "today", which also bounds date navigation.
  */
 
 import { dayTitle, dateLabel, shortDate } from "@/lib/dashboard/dates";
 import { boardRange, type BoardPeriod } from "@/lib/scores/period";
-import { addDays, isRealDate, todayIn } from "@/lib/tz";
+import { addDays, isRealDate } from "@/lib/tz";
 
 export type TodayScores = { recovery: number | null; strain: number | null; sleep: number | null };
 
@@ -17,7 +18,7 @@ export type GroupToday = {
   recovery: GroupAverage;
   strain: GroupAverage;
   sleep: GroupAverage;
-  /** Members with a successful sync on their own local today. */
+  /** Members with data (a daily_metrics or daily_scores row) for the group date. */
   synced: number;
   total: number;
 };
@@ -28,20 +29,14 @@ const avg = (vs: (number | null)[]): GroupAverage => {
   return { value: Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10, n: xs.length };
 };
 
-export function groupToday(members: readonly { scores: TodayScores; syncedToday: boolean }[]): GroupToday {
+export function groupToday(members: readonly { scores: TodayScores; hasData: boolean }[]): GroupToday {
   return {
     recovery: avg(members.map((m) => m.scores.recovery)),
     strain: avg(members.map((m) => m.scores.strain)),
     sleep: avg(members.map((m) => m.scores.sleep)),
-    synced: members.filter((m) => m.syncedToday).length,
+    synced: members.filter((m) => m.hasData).length,
     total: members.length,
   };
-}
-
-/** Whether the last successful sync happened on the member's current local date. */
-export function isSyncedToday(lastSyncAt: Date | null, tz: string, now: Date): boolean {
-  if (!lastSyncAt || lastSyncAt.getTime() > now.getTime() + 60_000) return false;
-  return todayIn(tz, lastSyncAt) === todayIn(tz, now);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -58,7 +53,7 @@ const first = (v: string | string[] | undefined): string | undefined => (Array.i
 /**
  * `?tab=strain&period=week&date=2026-09-22` → state. Unknown tabs mean Info,
  * anything but `week` means Day, and the date is clamped to [first data date,
- * today] (missing / malformed = today).
+ * today] (missing / malformed = today), where `today` is the group date.
  */
 export function parseGroupState(
   sp: Record<string, string | string[] | undefined>,
@@ -130,4 +125,9 @@ export function boardNav(period: BoardPeriod, date: string, today: string, first
     prev: from > loWeek ? (addDays(date, -7) < lo ? addDays(from, -1) : addDays(date, -7)) : null,
     next: from < thisWeek ? (next > today ? today : next) : null,
   };
+}
+
+/** "TODAY · SEP 29 · EUROPE/BERLIN": the group's date and timezone, for the Info tab. */
+export function groupDateContext(date: string, timezone: string): string {
+  return `TODAY · ${shortDate(date)} · ${timezone.toUpperCase()}`;
 }

@@ -81,14 +81,14 @@ function MemberSheet({ member, open, onClose }: { member: MemberView | null; ope
                 <span
                   aria-hidden
                   className="size-[6px] rounded-full"
-                  style={{ background: member.syncedToday ? "var(--recovery-green)" : "var(--dim)" }}
+                  style={{ background: member.hasData ? "var(--recovery-green)" : "var(--dim)" }}
                 />
                 {member.lastSynced ? `SYNCED ${member.lastSynced.toUpperCase()}` : "NEVER SYNCED"}
               </p>
             </div>
           </div>
           <div className="mt-7 flex items-center justify-between">
-            <h3 className="label text-text-2">Their today</h3>
+            <h3 className="label text-text-2">Their scores</h3>
             <span className="telemetry">{member.todayLabel}</span>
           </div>
           <div className="mt-5">
@@ -106,9 +106,11 @@ type InfoPanelProps = {
   trend: GroupTrendBar[];
   trendAvg: number | null;
   viewerId: string;
+  /** The group date and timezone, e.g. "TODAY · SEP 29 · EUROPE/BERLIN". */
+  dateContext: string;
 };
 
-export function InfoPanel({ members, today, trend, trendAvg, viewerId }: InfoPanelProps) {
+export function InfoPanel({ members, today, trend, trendAvg, viewerId, dateContext }: InfoPanelProps) {
   // The last opened member stays set while the sheet animates out.
   const [selected, setSelected] = useState<MemberView | null>(null);
   const [open, setOpen] = useState(false);
@@ -120,6 +122,12 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId }: InfoPan
 
   return (
     <Stagger className="space-y-3 px-4 pb-6 pt-4" delay={0.05}>
+      <StaggerItem>
+        <p className="telemetry px-1" data-testid="group-date-context">
+          {dateContext}
+        </p>
+      </StaggerItem>
+
       <StaggerItem>
         <Card glow={recoveryColorOrNeutral(today.recovery.value)}>
           <CardHead
@@ -139,14 +147,14 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId }: InfoPan
                 <li key={m.userId} className="flex w-[46px] shrink-0 flex-col items-center gap-1.5">
                   <span
                     className="relative transition-opacity"
-                    style={{ opacity: m.syncedToday ? 1 : 0.32, filter: m.syncedToday ? undefined : "grayscale(1)" }}
+                    style={{ opacity: m.hasData ? 1 : 0.32, filter: m.hasData ? undefined : "grayscale(1)" }}
                   >
                     <Avatar
                       user={avatarUserOf(m)}
                       size={34}
-                      alt={`${fullName(m)}: ${m.syncedToday ? "synced today" : "not synced today"}`}
+                      alt={`${fullName(m)}: ${m.hasData ? "synced today" : "not synced today"}`}
                       badge={
-                        m.syncedToday ? (
+                        m.hasData ? (
                           <span className="grid size-[14px] place-items-center rounded-full bg-recovery-green shadow-[0_0_0_2px_var(--card)]">
                             <svg aria-hidden width="8" height="8" viewBox="0 0 8 8">
                               <path d="M1.6 4.2 3.2 5.8 6.4 2.4" fill="none" stroke="var(--bg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -156,7 +164,7 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId }: InfoPan
                       }
                     />
                   </span>
-                  <span className={`w-full truncate text-center text-[10.5px] font-medium ${m.syncedToday ? "text-text-2" : "text-dim"}`}>
+                  <span className={`w-full truncate text-center text-[10.5px] font-medium ${m.hasData ? "text-text-2" : "text-dim"}`}>
                     {firstName(m)}
                   </span>
                 </li>
@@ -207,7 +215,7 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId }: InfoPan
                       <p className="telemetry mt-1 flex min-w-0 items-center gap-1 text-[9.5px]!">
                         {m.username && <span className="min-w-0 truncate">@{m.username}</span>}
                         {m.username && <span aria-hidden className="shrink-0">·</span>}
-                        <span className={`shrink-0 ${m.syncedToday ? "text-text-2" : ""}`}>
+                        <span className={`shrink-0 ${m.hasData ? "text-text-2" : ""}`}>
                           {m.lastSynced ? m.lastSynced.toUpperCase() : "NEVER"}
                         </span>
                       </p>

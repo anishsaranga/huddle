@@ -22,7 +22,7 @@ const isBoard = (t: GroupTab): t is ScoreMetric => t === "strain" || t === "reco
 
 type GroupScreenProps = {
   groupId: string;
-  /** The viewer's local today. */
+  /** The group's today (today in the group's timezone): the default date and the upper bound for navigation. */
   today: string;
   /** Earliest date with any member score (bounds ‹). */
   firstDate: string | null;
