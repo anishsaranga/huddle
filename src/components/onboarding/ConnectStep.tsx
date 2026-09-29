@@ -12,8 +12,8 @@ type ConnectStepProps = {
   /** The user's avatar, rendered by the caller (keeps DiceBear out of this component). */
   avatar: ReactNode;
   /**
-   * Slot for the personal sync key reveal (M3: API keys). Rendered inside the
-   * "Connect your iPhone" card. When omitted, a placeholder is shown.
+   * Slot for the personal sync key reveal (components/apikey/OnboardingKey).
+   * Rendered inside the "Connect your iPhone" card. When omitted, a placeholder is shown.
    */
   keySlot?: ReactNode;
 };
@@ -139,8 +139,7 @@ export function ConnectStep({ name, username, avatar, keySlot }: ConnectStepProp
             ))}
           </ol>
 
-          {/* ===== M3 SLOT: personal sync key reveal (API keys) =====
-              Pass `keySlot` from the onboarding flow once keys exist. */}
+          {/* Personal sync key reveal: the onboarding page passes <OnboardingKey> as `keySlot`. */}
           <div className="mt-5" data-slot="api-key-reveal">
             {keySlot ?? (
               <div className="rounded-xl border border-dashed border-hairline-strong px-4 py-3.5 text-center">

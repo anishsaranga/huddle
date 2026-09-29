@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { hasSessionCookie, isPublicPath } from "@/lib/route-access";
+import { acceptsApiKey, hasApiKeyCredentials, hasSessionCookie, isPublicPath } from "@/lib/route-access";
 
 /**
  * Optimistic auth gate: cookie presence only, no DB. Signed-out visitors to
@@ -10,6 +10,10 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (isPublicPath(pathname, process.env.NODE_ENV !== "production")) return NextResponse.next();
   if (hasSessionCookie(request.cookies)) return NextResponse.next();
+  // Session-or-key APIs: let key-bearing requests reach the route, which authenticates them.
+  if (acceptsApiKey(pathname) && hasApiKeyCredentials(request.headers, request.nextUrl.searchParams)) {
+    return NextResponse.next();
+  }
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

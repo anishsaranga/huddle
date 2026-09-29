@@ -33,3 +33,19 @@ export function isPublicPath(pathname: string, isDev: boolean): boolean {
 export function hasSessionCookie(cookies: { has(name: string): boolean }): boolean {
   return SESSION_COOKIE_NAMES.some((n) => cookies.has(n));
 }
+
+/**
+ * APIs that also accept an API key (session cookie OR key). The proxy lets
+ * these through when key-like credentials are present; the route itself does
+ * the real authentication.
+ */
+const API_KEY_PATHS = new Set(["/api/me/sync-status"]);
+
+/** Does the request carry key-like credentials (`Authorization: Bearer …` or `?key=`)? No validation. */
+export function hasApiKeyCredentials(headers: { get(name: string): string | null }, searchParams: URLSearchParams): boolean {
+  return /^bearer\s/i.test(headers.get("authorization") ?? "") || searchParams.has("key");
+}
+
+export function acceptsApiKey(pathname: string): boolean {
+  return API_KEY_PATHS.has(pathname);
+}

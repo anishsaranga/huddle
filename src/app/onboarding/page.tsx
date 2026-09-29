@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { OnboardingKey } from "@/components/apikey/OnboardingKey";
 import { OnboardingFlow, type OnboardingInitial } from "@/components/onboarding/OnboardingFlow";
 import { avatarUrl } from "@/components/ui/Avatar";
+import { getIngestUrl } from "@/lib/app-url";
 import { defaultConfigForSeed, parseAvatarConfig } from "@/lib/avatar/config";
 import { resumeStep } from "@/lib/profile/progress";
 import { sexSchema } from "@/lib/profile/schema";
@@ -37,5 +39,7 @@ export default async function OnboardingPage() {
     startStep: resumeStep(user),
   };
 
-  return <OnboardingFlow initial={initial} />;
+  // The key is created client-side only once the final step is reached (see OnboardingKey).
+  const keySlot = <OnboardingKey userId={user.id} ingestUrl={await getIngestUrl()} />;
+  return <OnboardingFlow initial={initial} connectKeySlot={keySlot} />;
 }

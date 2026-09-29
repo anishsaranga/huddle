@@ -48,6 +48,8 @@ async function stepBodyGoals(page: Page) {
   await next(page);
 
   await expect(page.getByRole("heading", { name: "You’re in" })).toBeVisible();
+  // The final step creates and reveals the sync key.
+  await expect(page.getByTestId("api-key-value")).toHaveText(/^gk_[A-Za-z0-9_-]{43}$/);
 }
 
 async function finish(page: Page) {

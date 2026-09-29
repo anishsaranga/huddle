@@ -367,17 +367,17 @@ describe("users", () => {
     expect(r).toMatchObject({ ok: false, code: "admin" });
   });
 
-  it("onUserDeactivated deletes the user's sessions (M3 adds key revocation here)", async () => {
+  it("onUserDeactivated deletes the user's sessions and revokes their keys", async () => {
     const u = await makeUser("u@example.com");
     const v = await makeUser("v@example.com");
     await makeSession(u.id);
     await makeSession(v.id);
-    expect(await onUserDeactivated(u.id)).toEqual({ sessionsDeleted: 1 });
+    expect(await onUserDeactivated(u.id)).toEqual({ sessionsDeleted: 1, keysRevoked: 0 });
     expect(await sessionsOf(u.id)).toBe(0);
     expect(await sessionsOf(v.id)).toBe(1);
   });
 
-  it("lists users with a status, and sync summaries are empty for now", async () => {
+  it("lists users with a status, and never-synced users have empty sync summaries", async () => {
     const admin = await makeAdmin();
     const active = await makeUser("active@example.com");
     const fresh = await makeUser("fresh@example.com", { onboardedAt: null });
@@ -393,11 +393,8 @@ describe("users", () => {
     });
     expect(rows.find((r) => r.id === admin.id)?.isAdmin).toBe(true);
 
-    const sync = await getSyncSummaries([active.id, fresh.id, gone.id]);
-    expect([...sync.values()]).toEqual([
-      { lastSyncAt: null, daysCovered: null },
-      { lastSyncAt: null, daysCovered: null },
-      { lastSyncAt: null, daysCovered: null },
-    ]);
+    const sync = await getSyncSummaries(db, [active.id, fresh.id, gone.id]);
+    const empty = { lastSyncAt: null, daysCovered: 0, firstDate: null, lastDate: null };
+    expect([...sync.values()]).toEqual([empty, empty, empty]);
   });
 });

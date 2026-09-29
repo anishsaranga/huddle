@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasSessionCookie, isPublicPath } from "@/lib/route-access";
+import { acceptsApiKey, hasApiKeyCredentials, hasSessionCookie, isPublicPath } from "@/lib/route-access";
 
 describe("isPublicPath", () => {
   it("lets auth pages, public APIs and static assets through", () => {
@@ -53,5 +53,21 @@ describe("hasSessionCookie", () => {
     expect(hasSessionCookie(jar("authjs.session-token"))).toBe(true);
     expect(hasSessionCookie(jar("__Secure-authjs.session-token"))).toBe(true);
     expect(hasSessionCookie(jar("authjs.csrf-token"))).toBe(false);
+  });
+});
+
+describe("API-key pass-through", () => {
+  const h = (v?: string) => new Headers(v ? { authorization: v } : {});
+  it("only /api/me/sync-status accepts keys", () => {
+    expect(acceptsApiKey("/api/me/sync-status")).toBe(true);
+    expect(acceptsApiKey("/api/me/username")).toBe(false);
+    expect(acceptsApiKey("/api/me/sync-status/x")).toBe(false);
+  });
+  it("detects key-like credentials in the header or query", () => {
+    expect(hasApiKeyCredentials(h("Bearer gk_x"), new URLSearchParams())).toBe(true);
+    expect(hasApiKeyCredentials(h("bearer gk_x"), new URLSearchParams())).toBe(true);
+    expect(hasApiKeyCredentials(h(), new URLSearchParams("key=gk_x"))).toBe(true);
+    expect(hasApiKeyCredentials(h("Basic abc"), new URLSearchParams())).toBe(false);
+    expect(hasApiKeyCredentials(h(), new URLSearchParams("u=1"))).toBe(false);
   });
 });

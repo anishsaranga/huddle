@@ -1,10 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(auth)/actions";
+import { KeySection } from "@/components/apikey/KeySection";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { ProfileView } from "@/components/profile/ProfileView";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { db } from "@/db";
+import { getKeyStatus } from "@/lib/apikey";
+import { getIngestUrl } from "@/lib/app-url";
 import { toProfileData } from "@/lib/profile/service";
 import { requireOnboardedUser } from "@/lib/session";
 
@@ -59,6 +63,7 @@ function SoonRow({ label, hint }: { label: string; hint: string }) {
 
 export default async function ProfilePage() {
   const user = await requireOnboardedUser();
+  const [key, ingestUrl] = await Promise.all([getKeyStatus(db, user.id), getIngestUrl()]);
 
   return (
     <ProfileView user={toProfileData(user)}>
@@ -74,10 +79,19 @@ export default async function ProfilePage() {
         </Card>
       )}
 
+      <KeySection
+        initial={{
+          active: key.active,
+          prefixHint: key.prefixHint,
+          createdAt: key.createdAt?.toISOString() ?? null,
+          lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
+        }}
+        ingestUrl={ingestUrl}
+      />
+
       <Card padding="p-0" className="divide-y divide-hairline overflow-hidden">
         <LinkRow href="/setup" label="Sync setup" hint="Connect your iPhone Shortcut" />
         <LinkRow href="/credits" label="Avatar credits" hint="Artists behind the characters" />
-        <SoonRow label="API key" hint="Your personal sync key" />
         <SoonRow label="Export my data" hint="Download everything as JSON" />
         <SoonRow label="Delete account" hint="Remove your account and data" />
       </Card>

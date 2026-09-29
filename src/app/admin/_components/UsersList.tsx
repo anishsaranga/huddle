@@ -127,8 +127,8 @@ function UserCard({
         <Stat label="Last sync" value={relativeSync(user.sync)} muted={!user.sync.lastSyncAt} />
         <Stat
           label="Days covered"
-          value={user.sync.daysCovered === null ? "—" : String(user.sync.daysCovered)}
-          muted={user.sync.daysCovered === null}
+          value={String(user.sync.daysCovered)}
+          muted={user.sync.daysCovered === 0}
         />
         <Stat label="Joined" value={formatShortDate(user.createdAt)} />
       </dl>

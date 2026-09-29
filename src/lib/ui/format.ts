@@ -31,3 +31,16 @@ const monthYear = new Intl.DateTimeFormat("en-US", { month: "short", year: "nume
 export function formatMonthYear(date: Date): string {
   return monthYear.format(date);
 }
+
+/** "Just now", "5 min ago", "3 h ago", "2 days ago", then a short date. */
+export function formatRelative(date: Date, now: Date = new Date()): string {
+  const s = Math.max(0, Math.round((now.getTime() - date.getTime()) / 1000));
+  if (s < 60) return "Just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return d === 1 ? "Yesterday" : `${d} days ago`;
+  return formatShortDate(date);
+}

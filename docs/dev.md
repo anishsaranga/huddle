@@ -108,4 +108,17 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
   deletes the photo. HEIC that sharp can't decode returns a friendly 422.
 - `/profile` cards open edit sheets (`components/profile/EditSheets.tsx`) built from the same field components as onboarding
   (`components/profile/fields.tsx`). The Playwright web server uses `AVATAR_DIR=.next-e2e/avatars`.
-- M3 hook: `ConnectStep` takes a `keySlot` prop (see `OnboardingFlow`'s `connectKeySlot`) for the API key reveal.
+- `ConnectStep` takes a `keySlot` prop (`OnboardingFlow`'s `connectKeySlot`); the onboarding page passes `<OnboardingKey>`, which creates the first API key when the final step mounts.
+
+## API keys and health data
+
+- Keys: `gk_` + base64url(32 bytes) (46 chars). `src/lib/apikey.ts`: only HMAC-SHA256(`API_KEY_PEPPER`) is stored in
+  `api_keys.hash`, plus an 8-char `prefix_hint`. One active key per user (partial unique index). `authenticateApiKey()` rejects
+  malformed keys without a DB hit, refuses revoked keys and deactivated users, and bumps `last_used_at` at most once a minute.
+  Deactivation (`onUserDeactivated`) revokes keys. Never log a key; log `keyId` / `prefixHint`.
+- UI: one-time reveal `components/apikey/KeyReveal.tsx`, used by onboarding (`OnboardingKey`) and Profile (`KeySection`:
+  regenerate / revoke). Mutations: `src/lib/apikey-actions.ts`. The ingest URL shown is `${APP_URL}/api/ingest`.
+- Metric fields are defined once in `src/lib/health/fields.ts` (name, column, unit, int/float, range, label, category);
+  `daily_metrics` columns are generated from it. Ingest event summary types: `src/lib/ingest/types.ts`.
+- `GET /api/me/sync-status` accepts a session or an API key (Bearer or `?key=`); a bad key gets a bare 401. The proxy lets
+  key-bearing requests to it through (`acceptsApiKey` in `route-access.ts`).
