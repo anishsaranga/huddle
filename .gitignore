@@ -14,3 +14,9 @@ next-env.d.ts
 /data/
 .DS_Store
 Thumbs.db
+
+# next.js extras
+/build
+*.pem
+.vercel
+npm-debug.log*
