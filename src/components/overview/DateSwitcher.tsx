@@ -25,6 +25,8 @@ type DateSwitcherProps = {
   onTitleClick?: () => void;
   /** A navigation is in flight (dims the date slightly). */
   pending?: boolean;
+  /** What the chevrons step by (their accessible names). Default "day". */
+  unit?: "day" | "week";
 };
 
 // Older days slide in from the left, newer from the right.
@@ -62,13 +64,15 @@ function Arrow({
   enabled,
   href,
   onClick,
+  unit = "day",
 }: {
   dir: "left" | "right";
   enabled: boolean;
   href?: string | null;
   onClick: () => void;
+  unit?: "day" | "week";
 }) {
-  const label = dir === "left" ? "Previous day" : "Next day";
+  const label = dir === "left" ? `Previous ${unit}` : `Next ${unit}`;
   if (href && enabled) {
     return (
       <MotionLink
@@ -116,6 +120,7 @@ export function DateSwitcher({
   nextHref,
   onTitleClick,
   pending = false,
+  unit = "day",
 }: DateSwitcherProps) {
   const label = (
     <AnimatePresence initial={false} custom={direction}>
@@ -144,7 +149,7 @@ export function DateSwitcher({
 
   return (
     <div className="nav-chrome flex items-center justify-center gap-2">
-      <Arrow dir="left" enabled={canPrev} href={prevHref} onClick={onPrev} />
+      <Arrow dir="left" enabled={canPrev} href={prevHref} onClick={onPrev} unit={unit} />
 
       <div
         className="relative h-[42px] w-44 overflow-hidden text-center transition-opacity duration-300"
@@ -165,7 +170,7 @@ export function DateSwitcher({
         )}
       </div>
 
-      <Arrow dir="right" enabled={canNext} href={nextHref} onClick={onNext} />
+      <Arrow dir="right" enabled={canNext} href={nextHref} onClick={onNext} unit={unit} />
     </div>
   );
 }

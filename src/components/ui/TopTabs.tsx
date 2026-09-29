@@ -11,10 +11,10 @@ type TopTabsProps = {
   defaultIndex?: number;
   onChange?: (index: number) => void;
   className?: string;
+  /** Tabs share the strip's width (tighter padding) instead of scrolling; for a handful of short labels. */
+  fill?: boolean;
 };
 
-/** Horizontal padding of each tab button (px-3); the underline spans the label only. */
-const TAB_PAD = 12;
 /** Letter-spacing leaves trailing space after the last glyph; trim it off the underline. */
 const TRAILING_TRACK = 1.5;
 
@@ -27,12 +27,16 @@ const TRAILING_TRACK = 1.5;
  * leave the track between panels. The underline is linked to the track's x:
  * it interpolates position and width between labels while dragging.
  */
-export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "" }: TopTabsProps) {
+export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "", fill = false }: TopTabsProps) {
   const baseId = useId();
   const reduced = useReducedMotion();
   const stripRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // The underline spans the label only (measured from the label span, whatever the padding).
+  const labelRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const panelRefs = useRef<(HTMLElement | null)[]>([]);
+  const [heights, setHeights] = useState<number[]>([]);
   const metrics = useRef<{ left: number; width: number }[]>([]);
   const widthRef = useRef(0);
   const [width, setWidth] = useState(0);
@@ -71,14 +75,15 @@ export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "" }: To
       const w = viewport.clientWidth;
       widthRef.current = w;
       setWidth(w);
-      metrics.current = tabRefs.current.map((el) =>
-        el
+      metrics.current = tabRefs.current.map((el, i) => {
+        const label = labelRefs.current[i];
+        return el && label
           ? {
-              left: el.offsetLeft + TAB_PAD,
-              width: Math.max(el.offsetWidth - TAB_PAD * 2 - TRAILING_TRACK, 8),
+              left: el.offsetLeft + label.offsetLeft,
+              width: Math.max(label.offsetWidth - TRAILING_TRACK, 8),
             }
-          : { left: 0, width: 0 },
-      );
+          : { left: 0, width: 0 };
+      });
       trackX.jump(-activeRef.current * w);
       placeLine(activeRef.current);
     };
@@ -88,6 +93,17 @@ export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "" }: To
     if (stripRef.current) ro.observe(stripRef.current);
     return () => ro.disconnect();
   }, [trackX, placeLine]);
+
+  // Track each panel's height: the viewport takes the active panel's, so a short
+  // panel next to a long one doesn't leave blank scroll space below it.
+  useLayoutEffect(() => {
+    const panels = panelRefs.current.filter((el): el is HTMLElement => !!el);
+    const read = () => setHeights(panelRefs.current.map((el) => el?.offsetHeight ?? 0));
+    read();
+    const ro = new ResizeObserver(read);
+    for (const el of panels) ro.observe(el);
+    return () => ro.disconnect();
+  }, [tabs.length]);
 
   // Keep the active tab visible in the strip.
   useEffect(() => {
@@ -142,11 +158,17 @@ export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "" }: To
               aria-controls={`${baseId}-panel-${tab.id}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => go(i)}
-              className={`relative h-11 shrink-0 px-3 text-[13px] font-semibold uppercase tracking-[0.12em] transition-colors duration-200 active:opacity-70 ${
+              className={`relative h-11 ${fill ? "min-w-fit flex-1 px-2" : "shrink-0 px-3"} text-[13px] font-semibold uppercase tracking-[0.12em] transition-colors duration-200 active:opacity-70 ${
                 selected ? "text-text" : "text-muted"
               }`}
             >
-              {tab.label}
+              <span
+                ref={(el) => {
+                  labelRefs.current[i] = el;
+                }}
+              >
+                {tab.label}
+              </span>
             </button>
           );
         })}
@@ -157,8 +179,11 @@ export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "" }: To
         />
       </div>
 
-      {/* overflow-x: clip (not hidden) so nothing can scroll this box programmatically. */}
-      <div ref={viewportRef} className="overflow-x-clip">
+      {/*
+        overflow: clip (not hidden) so nothing can scroll this box programmatically.
+        Its height follows the active panel (neighbours are cut to it mid-swipe).
+      */}
+      <div ref={viewportRef} className="overflow-clip" style={heights[active] ? { height: heights[active] } : undefined}>
         <motion.div
           className="flex items-start"
           // Before the first measurement (SSR paint) show the default panel via
@@ -180,6 +205,9 @@ export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "" }: To
           {tabs.map((tab, i) => (
             <section
               key={tab.id}
+              ref={(el) => {
+                panelRefs.current[i] = el;
+              }}
               id={`${baseId}-panel-${tab.id}`}
               role="tabpanel"
               aria-labelledby={`${baseId}-tab-${tab.id}`}

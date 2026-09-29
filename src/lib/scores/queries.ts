@@ -20,11 +20,12 @@ import {
 import type { Executor } from "@/lib/admin/db";
 import { isMetricName, type MetricName } from "@/lib/health/fields";
 import type { SleepStage } from "@/lib/ingest/types";
-import { addDays, daysBetween, todayIn } from "@/lib/tz";
+import { addDays, todayIn } from "@/lib/tz";
 import { priorDates, robustBaseline } from "@/lib/scores/baseline";
 import type { ScoreComponents } from "@/lib/scores/compute";
 import { isNum, round } from "@/lib/scores/math";
 import { BASELINE_DAYS, type HourRow } from "@/lib/scores/types";
+import { boardRange, weekStart, type BoardPeriod } from "@/lib/scores/period";
 
 /* ------------------------------------------------------------------------ */
 /* Overview                                                                  */
@@ -350,46 +351,61 @@ export async function getTrend(
 /* Group leaderboards                                                        */
 /* ------------------------------------------------------------------------ */
 
-export type BoardPeriod = "day" | "week";
+export type { BoardPeriod };
+export { boardRange, weekStart };
+
 /** A weekly entry needs at least this many days with a value. */
 export const WEEK_MIN_DAYS = 4;
 
-export type BoardRow = {
-  rank: number;
+export type BoardMember = {
   userId: string;
   username: string | null;
   displayName: string | null;
   avatarKind: AvatarKind | null;
   avatarConfig: AvatarConfig | null;
+  avatarPath: string | null;
+};
+
+export type BoardRow = BoardMember & {
+  rank: number;
   /** The day's score, or the weekly mean (1 decimal). */
   value: number;
   /** Days that went into the value. */
   days: number;
 };
 
-export type GroupBoard = { metric: ScoreMetric; period: BoardPeriod; from: string; to: string; rows: BoardRow[] };
+/** A member with some data in the week, but fewer than WEEK_MIN_DAYS days (not ranked). */
+export type BoardShortfall = BoardMember & { days: number };
 
-/** Monday of the ISO week containing `date`. */
-export function weekStart(date: string): string {
-  const dow = (((daysBetween("1970-01-05", date) % 7) + 7) % 7); // 1970-01-05 was a Monday
-  return addDays(date, -dow);
-}
+export type GroupBoard = {
+  metric: ScoreMetric;
+  period: BoardPeriod;
+  from: string;
+  to: string;
+  rows: BoardRow[];
+  /** Week only: members with 1-3 days of this score, most days first (always empty for a day). */
+  insufficient: BoardShortfall[];
+};
+
+export const SCORE_METRICS: readonly ScoreMetric[] = ["strain", "recovery", "sleep"];
+
+const nameKey = (m: BoardMember) => m.displayName ?? m.username ?? "";
 
 /**
- * Ranked members of a group for a score on a day, or averaged over the
+ * Ranked members of a group for every score on a day, or averaged over the
  * Monday-Sunday week containing `date` (each member's own local dates; at
- * least 4 days). Members without data (or deactivated) are left out. Ties
- * share a rank (1, 1, 3), compared at display precision.
+ * least 4 days). Members without data (or deactivated) are left out; in a
+ * week, members with 1-3 days come back in `insufficient`. Ties share a rank
+ * (1, 1, 3), compared at display precision. Two queries for all three boards.
  */
-export async function getGroupBoard(
+export async function getGroupBoards(
   db: Executor,
   groupId: string,
-  metric: ScoreMetric,
   period: BoardPeriod,
   date: string,
-): Promise<GroupBoard> {
-  const from = period === "day" ? date : weekStart(date);
-  const to = period === "day" ? date : addDays(from, 6);
+): Promise<Record<ScoreMetric, GroupBoard>> {
+  const { from, to } = boardRange(period, date);
+  const empty = (metric: ScoreMetric): GroupBoard => ({ metric, period, from, to, rows: [], insufficient: [] });
   const members = await db
     .select({
       userId: users.id,
@@ -397,15 +413,20 @@ export async function getGroupBoard(
       displayName: users.displayName,
       avatarKind: users.avatarKind,
       avatarConfig: users.avatarConfig,
+      avatarPath: users.avatarPath,
     })
     .from(groupMembers)
     .innerJoin(users, eq(users.id, groupMembers.userId))
     .where(and(eq(groupMembers.groupId, groupId), isNull(users.deactivatedAt)));
-  if (members.length === 0) return { metric, period, from, to, rows: [] };
+  if (members.length === 0) return { strain: empty("strain"), recovery: empty("recovery"), sleep: empty("sleep") };
 
-  const column = SCORE_COLUMN[metric];
   const scores = await db
-    .select({ userId: dailyScores.userId, value: column })
+    .select({
+      userId: dailyScores.userId,
+      strain: dailyScores.strain,
+      recovery: dailyScores.recovery,
+      sleep: dailyScores.sleepScore,
+    })
     .from(dailyScores)
     .where(
       and(
@@ -413,32 +434,50 @@ export async function getGroupBoard(
         between(dailyScores.localDate, from, to),
       ),
     );
-  const values = new Map<string, number[]>();
-  for (const s of scores) {
-    if (!isNum(s.value)) continue;
-    const list = values.get(s.userId);
-    if (list) list.push(s.value);
-    else values.set(s.userId, [s.value]);
-  }
 
-  const decimals = period === "week" || metric === "strain" ? 1 : 0;
-  const minDays = period === "week" ? WEEK_MIN_DAYS : 1;
-  const unranked: Omit<BoardRow, "rank">[] = [];
-  for (const m of members) {
-    const vs = values.get(m.userId) ?? [];
-    if (vs.length < minDays) continue;
-    unranked.push({ ...m, value: round(vs.reduce((a, b) => a + b, 0) / vs.length, decimals), days: vs.length });
-  }
-  unranked.sort(
-    (a, b) =>
-      b.value - a.value || (a.displayName ?? a.username ?? "").localeCompare(b.displayName ?? b.username ?? "") || a.userId.localeCompare(b.userId),
-  );
-  const rows: BoardRow[] = [];
-  unranked.forEach((r, i) => {
-    const rank = i > 0 && r.value === unranked[i - 1].value ? rows[i - 1].rank : i + 1;
-    rows.push({ rank, ...r });
-  });
-  return { metric, period, from, to, rows };
+  const build = (metric: ScoreMetric): GroupBoard => {
+    const values = new Map<string, number[]>();
+    for (const s of scores) {
+      const v = s[metric];
+      if (!isNum(v)) continue;
+      const list = values.get(s.userId);
+      if (list) list.push(v);
+      else values.set(s.userId, [v]);
+    }
+
+    const decimals = period === "week" || metric === "strain" ? 1 : 0;
+    const minDays = period === "week" ? WEEK_MIN_DAYS : 1;
+    const unranked: Omit<BoardRow, "rank">[] = [];
+    const insufficient: BoardShortfall[] = [];
+    for (const m of members) {
+      const vs = values.get(m.userId) ?? [];
+      if (vs.length === 0) continue;
+      if (vs.length < minDays) insufficient.push({ ...m, days: vs.length });
+      else unranked.push({ ...m, value: round(vs.reduce((a, b) => a + b, 0) / vs.length, decimals), days: vs.length });
+    }
+    const byName = (a: BoardMember, b: BoardMember) => nameKey(a).localeCompare(nameKey(b)) || a.userId.localeCompare(b.userId);
+    unranked.sort((a, b) => b.value - a.value || byName(a, b));
+    insufficient.sort((a, b) => b.days - a.days || byName(a, b));
+    const rows: BoardRow[] = [];
+    unranked.forEach((r, i) => {
+      const rank = i > 0 && r.value === unranked[i - 1].value ? rows[i - 1].rank : i + 1;
+      rows.push({ rank, ...r });
+    });
+    return { metric, period, from, to, rows, insufficient };
+  };
+
+  return { strain: build("strain"), recovery: build("recovery"), sleep: build("sleep") };
+}
+
+/** One score's board (see `getGroupBoards`). */
+export async function getGroupBoard(
+  db: Executor,
+  groupId: string,
+  metric: ScoreMetric,
+  period: BoardPeriod,
+  date: string,
+): Promise<GroupBoard> {
+  return (await getGroupBoards(db, groupId, period, date))[metric];
 }
 
 /** Latest date with a stored score for the user (for "today" fallbacks); null when none. */
