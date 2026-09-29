@@ -122,3 +122,17 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
   `daily_metrics` columns are generated from it. Ingest event summary types: `src/lib/ingest/types.ts`.
 - `GET /api/me/sync-status` accepts a session or an API key (Bearer or `?key=`); a bad key gets a bare 401. The proxy lets
   key-bearing requests to it through (`acceptsApiKey` in `route-access.ts`).
+
+## Ingest (`POST /api/ingest`)
+
+- Payload reference, status codes and examples: `docs/ingest-api.md` (its metric table is checked against
+  `fields.ts` by `tests/unit/ingest-docs.test.ts`).
+- Pipeline: `src/lib/ingest/handler.ts` (IP limit -> key auth -> key limit -> body -> JSON -> `schema.ts` (zod shapes,
+  numeric coercion, columns) -> `normalize.ts` (timezone, date window, hr hours, sleep segments) -> `upsert.ts` (one
+  transaction, per-user advisory lock) -> `onDataIngested` in `src/lib/scores/hooks.ts`). Sleep sessions/nights are pure
+  functions in `sleep-merge.ts`; timezone helpers in `src/lib/tz.ts`; limiter in `src/lib/ratelimit.ts` (in memory,
+  single instance).
+- Every authenticated request writes an `ingest_events` row and one `info` log line (`module: "ingest"`); the scrubbed
+  body is logged at `debug`. 401s log only ip/reason/method.
+- The proxy matcher skips `/api/ingest` so Next doesn't buffer the body (up to 10 MB) before the route's 3 MB cap.
+- Tests swap collaborators through `ingestDeps` (logger capture, failing hook/db) and call `resetIngestLimiters()`.

@@ -22,6 +22,9 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Skip Next internals and static files in /public (anything with an extension).
-  matcher: ["/((?!_next/static|_next/image|.*\\.[a-zA-Z0-9]+$).*)"],
+  // Skip Next internals, static files in /public (anything with an extension), and
+  // /api/ingest: it authenticates by API key itself, and when the proxy runs Next
+  // buffers the whole request body (up to 10 MB) before the route can apply its
+  // own 3 MB streaming cap. Keep in sync with tests/unit/proxy-matcher.test.ts.
+  matcher: ["/((?!_next/static|_next/image|api/ingest(?:/|$)|.*\\.[a-zA-Z0-9]+$).*)"],
 };

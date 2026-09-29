@@ -32,6 +32,11 @@ export type MetricFieldDef = {
   /** Human label for the admin coverage view and export. */
   readonly label: string;
   readonly category: MetricCategory;
+  /**
+   * A percentage Health may report as a 0-1 fraction (e.g. SpO2 0.97). At
+   * ingest, a value <= 1 is multiplied by 100 when the result is in range.
+   */
+  readonly fraction?: boolean;
 };
 
 export const METRIC_FIELDS = [
@@ -51,12 +56,12 @@ export const METRIC_FIELDS = [
   { name: "hrv_sdnn_ms", column: "hrv_sdnn_ms", unit: "ms", type: "float", min: 1, max: 500, label: "Heart rate variability (SDNN)", category: "heart" },
   { name: "vo2max", column: "vo2max", unit: "mL/kg/min", type: "float", min: 5, max: 100, label: "VO2 max", category: "heart" },
   // Vitals
-  { name: "spo2_pct", column: "spo2_pct", unit: "%", type: "float", min: 50, max: 100, label: "Blood oxygen", category: "vitals" },
+  { name: "spo2_pct", column: "spo2_pct", unit: "%", type: "float", min: 50, max: 100, label: "Blood oxygen", category: "vitals", fraction: true },
   { name: "resp_rate", column: "resp_rate", unit: "breaths/min", type: "float", min: 4, max: 60, label: "Respiratory rate", category: "vitals" },
   { name: "wrist_temp_c", column: "wrist_temp_c", unit: "°C", type: "float", min: 25, max: 45, label: "Sleeping wrist temperature", category: "vitals" },
   // Body
   { name: "weight_kg", column: "weight_kg", unit: "kg", type: "float", min: 20, max: 400, label: "Weight", category: "body" },
-  { name: "body_fat_pct", column: "body_fat_pct", unit: "%", type: "float", min: 1, max: 80, label: "Body fat", category: "body" },
+  { name: "body_fat_pct", column: "body_fat_pct", unit: "%", type: "float", min: 1, max: 80, label: "Body fat", category: "body", fraction: true },
 ] as const satisfies readonly MetricFieldDef[];
 
 export type MetricField = (typeof METRIC_FIELDS)[number];
