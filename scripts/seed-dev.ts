@@ -205,14 +205,26 @@ async function main() {
     ingestDeps.limiters = { ip: big(), key: big() };
   }
 
+  /* ------------------------------ scores ------------------------------ */
+
+  // The ingest hook already recomputed scores after every request; one full
+  // pass per user makes the result independent of the order things arrived in.
+  const { recomputeUser } = await import("../src/lib/scores/recompute");
+  const scoreRows = new Map<string, number>();
+  for (const u of DEMO_USERS) {
+    const today = localDateOf(now.getTime(), u.timezone);
+    const from = addDays(today, -(TOTAL_DAYS - 1));
+    scoreRows.set(u.slug, await recomputeUser(db, ids.get(u.slug)!, from, addDays(today, 1)));
+  }
+
   /* ------------------------------ summary ------------------------------ */
 
-  const rows: string[][] = [["user", "profile", "format", "tz", "days", "requests", "key"]];
+  const rows: string[][] = [["user", "profile", "format", "tz", "days", "scores", "requests", "key"]];
   for (const u of DEMO_USERS) {
     const id = ids.get(u.slug)!;
     const [{ days }] = await db.select({ days: count() }).from(schema.dailyMetrics).where(eq(schema.dailyMetrics.userId, id));
     const [{ events }] = await db.select({ events: count() }).from(schema.ingestEvents).where(eq(schema.ingestEvents.userId, id));
-    rows.push([u.displayName, PROFILE_LABELS[u.profile], u.format, u.timezone, String(days), String(events), `${keys.get(u.slug)!.prefix}…`]);
+    rows.push([u.displayName, PROFILE_LABELS[u.profile], u.format, u.timezone, String(days), String(scoreRows.get(u.slug) ?? 0), String(events), `${keys.get(u.slug)!.prefix}…`]);
   }
   const widths = rows[0].map((_, c) => Math.max(...rows.map((r) => r[c].length)));
   for (const [i, r] of rows.entries()) {

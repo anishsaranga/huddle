@@ -14,7 +14,7 @@ import {
   type DemoUser,
   type ProfileId,
 } from "../../scripts/seed/generate";
-import { checkSeedTarget, isSeedableDatabase } from "../../scripts/seed/guard";
+import { checkDevDatabase, checkSeedTarget, isSeedableDatabase } from "../../scripts/seed/guard";
 
 /** Noon UTC, so it's the same calendar day (or the next) everywhere and no night is still "in the future". */
 const NOW = new Date("2026-09-29T12:00:00Z");
@@ -229,6 +229,13 @@ describe("seed guard", () => {
     expect(checkSeedTarget({ ...good, API_KEY_PEPPER: undefined }).ok).toBe(false);
     expect(isSeedableDatabase("huddle2")).toBe(false);
     expect(isSeedableDatabase("test")).toBe(false);
+  });
+
+  it("the score recompute script uses the same database rules, without needing the pepper", () => {
+    expect(checkDevDatabase({ NODE_ENV: good.NODE_ENV, DATABASE_URL: good.DATABASE_URL }).ok).toBe(true);
+    expect(checkDevDatabase({ ...good, NODE_ENV: "production" }).ok).toBe(false);
+    const r = checkDevDatabase({ ...good, DATABASE_URL: "postgres://u:p@db:5432/huddle_prod" }, "recompute scores in");
+    expect(r).toEqual({ ok: false, error: expect.stringContaining("refusing to recompute scores in database \"huddle_prod\"") });
   });
 
   it("never echoes the password", () => {

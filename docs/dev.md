@@ -155,3 +155,13 @@ Fills the **dev** database with six demo friends and 90 days of data so the admi
 - Device profiles (`scripts/seed/generate.ts`): **Apple Watch** (everything incl. HRV, SpO2, resp rate, wrist temp, VO2 max; Core/Deep/REM/Awake from "Apple Watch", In Bed from "iPhone"), **Fitbit** (no HRV; Light/Deep/REM/Awake from "Google Health"), **Zepp** (only Asleep + Awake), **iPhone only** (steps, distance, flights, active kcal; In Bed only, no hourly HR). Formats: columnar (newline-joined text), rows (arrays), and a bare array of days. Arjun sends an unknown `cycling_km`, Maya `walking_steadiness`.
 - Deterministic: every value is a function of (person, local date) through a seeded PRNG (weekend late nights, hard training days with high afternoon HR, sick / poor-recovery stretches), so reruns give the same numbers for the same dates.
 - Tests: `tests/unit/seed-generate.test.ts` checks that every profile's payloads validate against `src/lib/ingest/schema.ts` (no DB).
+
+## Scores (`src/lib/scores/`)
+
+Huddle's own formulas, all pure and documented at the top of each file: `sleep.ts` (0-100), `recovery.ts` (0-100, bands green >= 67 / yellow / red <= 33), `strain.ts` (0-21, calibration fixtures listed in the header and asserted in `tests/unit/scores-strain.test.ts`). `baseline.ts` has the robust 30-day baselines (winsorized mean/SD with per-metric SD floors, >= 4 values) and the loader (one query per table).
+
+- `compute.ts`: `computeDay(ctx, date)` from loaded inputs. Scores come only from the raw tables (never from stored scores), so recomputes are idempotent.
+- `recompute.ts`: `recomputeUser(db, userId, from, to)` writes `daily_scores` in one transaction (per-user advisory lock). Dates with any input get a row (a null score's reason is in `components`, e.g. `recovery.reason = "calibrating"` with `calibrationDaysLeft`); dates without input lose theirs. `components` = `{ v: SCORE_VERSION, sleep, recovery, strain }`; bump `SCORE_VERSION` when a formula changes and run the recompute.
+- The ingest hook (`hooks.ts`) recomputes from the earliest affected date to 37 days after the latest (30-day baselines + 7-night sleep consistency), capped at tomorrow.
+- `queries.ts`: `getOverview`, `getTrend` (`1w`/`1m`/`6m`), `getGroupBoard` (day or Mon-Sun week, >= 4 days, ties share a rank).
+- `npm run scores:recompute [-- --user <id|email|username>] [--from D] [--to D] [--show N]`: dev/test databases only (same guard as the seed). `db:seed` runs a full recompute at the end.

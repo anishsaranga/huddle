@@ -15,7 +15,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx scripts/seed-dev.ts"
+    "db:seed": "tsx scripts/seed-dev.ts",
+    "scores:recompute": "tsx scripts/recompute-scores.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",
