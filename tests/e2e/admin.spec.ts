@@ -22,7 +22,7 @@ async function settle(page: Page) {
 test.describe("non-admins", () => {
   test("get a 404 for every admin page", async ({ page }) => {
     await loginAs(page, `e2e-plain-${run}@example.com`);
-    for (const path of ["/admin", "/admin/allowlist", "/admin/groups", "/admin/users"]) {
+    for (const path of ["/admin", "/admin/allowlist", "/admin/groups", "/admin/users", "/admin/data"]) {
       const res = await page.goto(path);
       expect(res?.status(), path).toBe(404);
       await expect(page.getByText("Allowlist", { exact: true })).toHaveCount(0);

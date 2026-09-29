@@ -44,3 +44,28 @@ export function formatRelative(date: Date, now: Date = new Date()): string {
   if (d < 7) return d === 1 ? "Yesterday" : `${d} days ago`;
   return formatShortDate(date);
 }
+
+/** "812 B", "14.2 KB", "2.81 MB" (binary units, one to two decimals). */
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${formatNumber(bytes / 1024, 1)} KB`;
+  return `${formatNumber(bytes / (1024 * 1024), 2)} MB`;
+}
+
+const utcStamp = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+  timeZone: "UTC",
+});
+
+/** "2026-09-29 14:03:22" in UTC (pinned, so server and client agree). */
+export function formatUtcStamp(date: Date): string {
+  const p = Object.fromEntries(utcStamp.formatToParts(date).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+}

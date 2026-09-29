@@ -8,6 +8,7 @@ const SECTIONS = [
   { value: "allowlist", label: "Allowlist" },
   { value: "groups", label: "Groups" },
   { value: "users", label: "Users" },
+  { value: "data", label: "Data" },
 ] as const;
 
 type Section = (typeof SECTIONS)[number]["value"];

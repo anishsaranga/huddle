@@ -21,7 +21,7 @@ npm run dev                 # http://localhost:3000
 - `is_admin` is recomputed on every sign-in (`enforceAdminFlags()` in `src/lib/auth-db.ts`): true only for
   `ADMIN_EMAIL`. Changing `ADMIN_EMAIL` demotes the old admin on the next sign-in by anyone.
 - Emails are stored lowercase (CHECK constraints on `users.email` and `allowed_emails.email`).
-- The admin panel lives at `/admin` (allowlist, groups, users; 404 for non-admins; entry card on `/profile`). Mutations are
+- The admin panel lives at `/admin` (allowlist, groups, users, data; 404 for non-admins; entry card on `/profile`). Mutations are
   server actions in `src/app/admin/actions.ts`, backed by `src/lib/admin/*`. `onUserDeactivated()` in
   `src/lib/admin/lifecycle.ts` is where M3 adds API-key revocation. The e2e server sets `ADMIN_EMAIL=e2e-admin@example.com`
   (`tests/support/e2e.ts`).
@@ -136,3 +136,22 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
   body is logged at `debug`. 401s log only ip/reason/method.
 - The proxy matcher skips `/api/ingest` so Next doesn't buffer the body (up to 10 MB) before the route's 3 MB cap.
 - Tests swap collaborators through `ingestDeps` (logger capture, failing hook/db) and call `resetIngestLimiters()`.
+
+## Admin Data section (`/admin/data`)
+
+What each friend's devices actually send. All of it is admin-only (the layout, every page and the lazy-load server actions call `requireAdmin()`). DB logic: `src/lib/admin/data.ts` (functions take `db`); UI: `src/app/admin/data/`.
+
+- **Coverage grid**: users x metrics (columns from `src/lib/admin/coverage-columns.ts`: every metric in `fields.ts` grouped by category, plus HR hourly, Sleep, Sleep stages). Each cell is the % of the user's last 30 local dates (their own timezone, ending today) with a non-null value. Two SQL queries however many users. Tap a cell for the detail sheet, a name for the ingest log.
+- **Unknown fields** (last 90 days, from `ingest_events.summary.unknownFields`) and **Sleep sources** (from `summary.sleepSources`, plus how many nights each source won in `sleep_nights`).
+- **Ingest log** (`/admin/data/[userId]?status=all|ok|errors&page=n`): 25 per page, newest first. The list omits the per-day field inventory and the raw body; expanding a row loads the inventory (`getIngestEventDetailAction`) and "Show body" loads the body (`getIngestEventBodyAction`), pretty-printed and cut at 200 KB (bodies can be 3 MB; only that much leaves Postgres).
+
+## Dev seed (`npm run db:seed`)
+
+Fills the **dev** database with six demo friends and 90 days of data so the admin views, and later the scores and charts, have something real to show. Run `npm run db:up && npm run db:migrate` first.
+
+- Refuses to run with `NODE_ENV=production` or when the `DATABASE_URL` database isn't named `huddle` or ending in `_test`; it prints which database it is seeding.
+- Demo users (`*@demo.huddle.test`, matched by email so reruns update instead of duplicate): onboarded, DiceBear avatar (`randomConfig`, seeded), usernames, timezones (Asia/Kolkata, Europe/Berlin, America/New_York), goals, allowlisted, all in the group "Morning Crew" (plus the `ADMIN_EMAIL` user if they exist). Each run replaces the demo users' health data and ingest events and **rotates their API keys** (only the key prefix is printed).
+- Data goes through the real pipeline: `handleIngest()` is called with constructed `Request`s, in 30-day chunks (backfill), then simulated morning syncs over the last days (stamped in the past, one user via `?key=`), a fresh sync, and a few failures (a 400 validation error, a 400 invalid JSON, a 429).
+- Device profiles (`scripts/seed/generate.ts`): **Apple Watch** (everything incl. HRV, SpO2, resp rate, wrist temp, VO2 max; Core/Deep/REM/Awake from "Apple Watch", In Bed from "iPhone"), **Fitbit** (no HRV; Light/Deep/REM/Awake from "Google Health"), **Zepp** (only Asleep + Awake), **iPhone only** (steps, distance, flights, active kcal; In Bed only, no hourly HR). Formats: columnar (newline-joined text), rows (arrays), and a bare array of days. Arjun sends an unknown `cycling_km`, Maya `walking_steadiness`.
+- Deterministic: every value is a function of (person, local date) through a seeded PRNG (weekend late nights, hard training days with high afternoon HR, sick / poor-recovery stretches), so reruns give the same numbers for the same dates.
+- Tests: `tests/unit/seed-generate.test.ts` checks that every profile's payloads validate against `src/lib/ingest/schema.ts` (no DB).
