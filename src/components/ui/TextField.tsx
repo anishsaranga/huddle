@@ -38,20 +38,37 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id"> & {
   label: string;
   error?: string | null;
   hint?: ReactNode;
+  /** Muted text inside the left edge (e.g. "@"). */
+  leading?: ReactNode;
+  /** Slot inside the right edge (a unit, a status icon). */
+  trailing?: ReactNode;
 };
 
 /** Labelled text input (16px, so iOS doesn't zoom on focus). */
-export function TextField({ label, error, hint, className = "", ...rest }: TextFieldProps) {
+export function TextField({ label, error, hint, leading, trailing, className = "", ...rest }: TextFieldProps) {
   const id = useId();
   return (
     <FieldShell id={id} label={label} error={error} hint={hint}>
-      <input
-        id={id}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error || hint ? `${id}-msg` : undefined}
-        className={`${control} ${className}`}
-        {...rest}
-      />
+      <div className="relative">
+        {leading && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-muted"
+          >
+            {leading}
+          </span>
+        )}
+        <input
+          id={id}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? `${id}-msg` : undefined}
+          className={`${control} ${leading ? "pl-9" : ""} ${trailing ? "pr-14" : ""} ${className}`}
+          {...rest}
+        />
+        {trailing && (
+          <span className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center text-muted">{trailing}</span>
+        )}
+      </div>
     </FieldShell>
   );
 }

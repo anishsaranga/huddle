@@ -24,3 +24,10 @@ const shortDate = new Intl.DateTimeFormat("en-GB", {
 export function formatShortDate(date: Date): string {
   return shortDate.format(date);
 }
+
+const monthYear = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+
+/** "Sep 2026". Locale- and timezone-pinned like formatShortDate. */
+export function formatMonthYear(date: Date): string {
+  return monthYear.format(date);
+}

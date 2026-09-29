@@ -21,6 +21,8 @@ export default defineConfig({
       E2E_AUTH: "1",
       NEXT_DIST_DIR: ".next-e2e",
       DATABASE_URL: TEST_DATABASE_URL,
+      // Uploaded avatar photos land in the (gitignored) e2e dist dir, not ./data.
+      AVATAR_DIR: ".next-e2e/avatars",
       // The account that is admin on this server (whatever .env says).
       ADMIN_EMAIL: E2E_ADMIN_EMAIL,
       // Deterministic "Google not configured" behavior regardless of .env.

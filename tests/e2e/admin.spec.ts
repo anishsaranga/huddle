@@ -32,7 +32,7 @@ test.describe("non-admins", () => {
   test("don't see the Admin card on Profile", async ({ page }) => {
     await loginAs(page, `e2e-plain2-${run}@example.com`);
     await page.goto("/profile");
-    await expect(page.getByRole("heading", { name: "Profile" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit personal" })).toBeVisible();
     await expect(page.locator("a[href='/admin']")).toHaveCount(0);
   });
 

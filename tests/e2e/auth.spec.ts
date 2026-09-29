@@ -66,7 +66,7 @@ test.describe("signed in", () => {
     await loginAs(page, "e2e-new@example.com", { onboarded: false });
     await page.goto("/home");
     await expect(page).toHaveURL(/\/onboarding$/);
-    await expect(page.getByRole("heading", { name: "Welcome" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Who are you?" })).toBeVisible();
   });
 
   test("sign out from Profile returns to /login", async ({ page }) => {

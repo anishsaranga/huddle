@@ -90,3 +90,22 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
 - `/api/avatar/:userId` needs a session; `?format=png&size=16..1024` rasterizes with sharp. Uploads are read from
   `AVATAR_DIR` (default `./data/avatars` in dev, `/data/avatars` in production).
 - `/credits` lists each style's license and attribution (public).
+
+## Onboarding and profile
+
+- `/onboarding` (`components/onboarding/*`) is a 6-step stepper (identity, avatar, basics, body, goals, connect). Each step is saved to
+  the `users` row through the `saveSectionAction` / `saveAvatarConfigAction` server actions (`lib/profile/actions.ts`), so a refresh
+  resumes at the first incomplete step (`lib/profile/progress.ts`). Only `finishOnboardingAction` sets `onboarded_at`
+  (it can also redirect to `/setup`, since `(app)` pages need an onboarded user).
+- Validation lives in `lib/profile/schema.ts` and is shared by onboarding, the Profile edit sheets and the actions. Storage is always
+  cm / kg; ft/in and lb convert at the edge. DB logic is in `lib/profile/service.ts` (plain functions over a Drizzle handle, used by the
+  integration tests).
+- Username availability: `GET /api/me/username?u=…` (session required; your own username counts as available). The unique index is
+  still the source of truth on save.
+- Photo upload: the client crops a 512px JPEG (`components/profile/PhotoCropper.tsx`) and POSTs it to `POST /api/me/avatar`
+  (multipart `file`, max 5 MB). The server sniffs the real type with sharp, re-encodes to a 512x512 WebP with metadata stripped, stores
+  `${AVATAR_DIR}/${userId}-${hash}.webp`, deletes the previous file and sets `avatar_kind='upload'`. Switching back to a character
+  deletes the photo. HEIC that sharp can't decode returns a friendly 422.
+- `/profile` cards open edit sheets (`components/profile/EditSheets.tsx`) built from the same field components as onboarding
+  (`components/profile/fields.tsx`). The Playwright web server uses `AVATAR_DIR=.next-e2e/avatars`.
+- M3 hook: `ConnectStep` takes a `keySlot` prop (see `OnboardingFlow`'s `connectKeySlot`) for the API key reveal.
