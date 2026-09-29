@@ -14,7 +14,7 @@ async function main() {
     console.error("DATABASE_URL is not set (see .env.example).");
     process.exit(1);
   }
-  const client = postgres(url, { max: 1 });
+  const client = postgres(url, { max: 1, onnotice: () => {} });
   try {
     await migrate(drizzle(client), { migrationsFolder: "./drizzle" });
     console.log("Migrations applied.");

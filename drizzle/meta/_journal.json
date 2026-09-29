@@ -8,6 +8,20 @@
       "when": 1790649837650,
       "tag": "0000_damp_lilith",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790652086839,
+      "tag": "0001_drop_app_meta",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790652089155,
+      "tag": "0002_auth_identity_groups",
+      "breakpoints": true
     }
   ]
 }

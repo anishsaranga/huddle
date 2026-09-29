@@ -33,3 +33,19 @@ export const sql: postgres.Sql = new Proxy((() => {}) as unknown as postgres.Sql
   apply: (_t, _this, args) =>
     (init().sql as unknown as (...a: unknown[]) => unknown)(...args),
 });
+
+/**
+ * The real (non-proxy) Drizzle instance. Needed where libraries inspect the
+ * db's class, e.g. the Auth.js Drizzle adapter's dialect detection.
+ */
+export function getDb(): Db {
+  return init().db;
+}
+
+/** Close the pool and forget it (tests, worker shutdown). The next use reconnects. */
+export async function closeDb(): Promise<void> {
+  const client = globalForDb.__huddleSql;
+  globalForDb.__huddleSql = undefined;
+  globalForDb.__huddleDb = undefined;
+  await client?.end();
+}

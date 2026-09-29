@@ -1,6 +1,10 @@
 import { TabBar } from "@/components/TabBar";
+import { requireOnboardedUser } from "@/lib/session";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Authoritative gate for every app page (the proxy only checks the cookie).
+  await requireOnboardedUser();
+
   return (
     <div className="flex h-dvh flex-col">
       <main
