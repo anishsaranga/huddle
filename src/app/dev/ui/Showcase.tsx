@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { AvatarCustomizer } from "@/components/avatar/AvatarCustomizer";
 import { Dial } from "@/components/charts/Dial";
 import { HourBars } from "@/components/charts/HourBars";
 import { Hypnogram } from "@/components/charts/Hypnogram";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { TrendBars } from "@/components/charts/TrendBars";
 import { AmbientGlow } from "@/components/ui/AmbientGlow";
+import { Avatar, AvatarStack } from "@/components/ui/Avatar";
+import { ConfigAvatar } from "@/components/avatar/ConfigAvatar";
+import { avatarDataUri } from "@/lib/avatar/render";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CountUp } from "@/components/ui/CountUp";
@@ -24,6 +28,8 @@ import {
   strainTrend,
   trendLabels,
 } from "@/lib/mock/overview";
+import { defaultConfigForSeed, randomConfig, seededRng, type AvatarConfig } from "@/lib/avatar/config";
+import { STYLE_IDS } from "@/lib/avatar/styles";
 import { recoveryColor, SIGNAL, STAGE_COLORS, STAGE_LABELS, STAGE_ORDER, STRAIN_MAX } from "@/lib/ui/colors";
 
 type Band = "green" | "yellow" | "red";
@@ -39,9 +45,24 @@ const leaderboard = [
   { name: "Priya", value: 12 },
 ];
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+const sampleAvatars = Object.fromEntries(
+  STYLE_IDS.map((s) => [s, randomConfig(s, seededRng(`showcase:${s}`))]),
+) as Record<(typeof STYLE_IDS)[number], AvatarConfig>;
+
+function RankChip({ n, color }: { n: number; color: string }) {
   return (
-    <StaggerItem as="section" className="space-y-3">
+    <span
+      className="num grid size-[22px] place-items-center rounded-full font-display text-[13px] font-bold text-bg"
+      style={{ background: color, boxShadow: "0 0 0 2px var(--bg)" }}
+    >
+      {n}
+    </span>
+  );
+}
+
+function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
+  return (
+    <StaggerItem as="section" className="scroll-mt-6 space-y-3" id={id}>
       <h2 className="telemetry px-1 text-text-2">{`// ${title}`}</h2>
       {children}
     </StaggerItem>
@@ -85,6 +106,7 @@ export function Showcase() {
   const [loading, setLoading] = useState(false);
   const [counter, setCounter] = useState(1284);
   const [replay, setReplay] = useState(0);
+  const [avatar, setAvatar] = useState<AvatarConfig>(() => defaultConfigForSeed("huddle-dev"));
   const { toast } = useToast();
 
   const bandValue = BAND_VALUE[band];
@@ -117,6 +139,75 @@ export function Showcase() {
         </header>
 
         <Stagger delay={0.1} className="space-y-9 px-4 pb-24">
+          <Section title="Avatars · customizer" id="avatars">
+            <AvatarCustomizer value={avatar} onChange={setAvatar} />
+            <details className="px-1">
+              <summary className="telemetry cursor-pointer">Config JSON</summary>
+              <pre className="mt-2 overflow-x-auto rounded-xl bg-card-sunken p-3 font-mono text-[11px] leading-relaxed text-muted">
+                {JSON.stringify(avatar, null, 2)}
+              </pre>
+            </details>
+          </Section>
+
+          <Section title="Avatars · sizes, rings, fallbacks" id="avatar-sizes">
+            <Card>
+              <div className="flex items-end justify-between">
+                {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => (
+                  <div key={size} className="flex flex-col items-center gap-2">
+                    <ConfigAvatar config={avatar} size={size} alt={`Avatar ${size}`} />
+                    <span className="telemetry">{size}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 grid grid-cols-4 gap-y-5">
+                {STYLE_IDS.map((style) => (
+                  <div key={style} className="flex flex-col items-center gap-2">
+                    <ConfigAvatar config={sampleAvatars[style]} size="lg" />
+                    <span className="telemetry text-[9px]">{style}</span>
+                  </div>
+                ))}
+                <div className="flex flex-col items-center gap-2">
+                  <Avatar label="Maya Chen" size="lg" />
+                  <span className="telemetry text-[9px]">initials</span>
+                </div>
+              </div>
+            </Card>
+            <Card>
+              <p className="label mb-5">Flair rings · champions</p>
+              <div className="flex items-center justify-around">
+                <ConfigAvatar
+                  config={sampleAvatars.adventurer}
+                  size={64}
+                  ring={SIGNAL.green}
+                  badge={<RankChip n={1} color={SIGNAL.green} />}
+                />
+                <ConfigAvatar
+                  config={sampleAvatars.avataaars}
+                  size={64}
+                  ring={SIGNAL.strain}
+                  badge={<RankChip n={1} color={SIGNAL.strain} />}
+                />
+                <ConfigAvatar
+                  config={sampleAvatars.micah}
+                  size={64}
+                  ring={SIGNAL.sleep}
+                  badge={<RankChip n={1} color={SIGNAL.sleep} />}
+                />
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <AvatarStack
+                  people={STYLE_IDS.slice(0, 4).map((s) => ({ id: s, label: s, src: avatarDataUri(sampleAvatars[s]) }))}
+                  total={9}
+                  size="md"
+                />
+                <div className="flex items-center gap-3">
+                  <ConfigAvatar config={sampleAvatars.lorelei} size="md" ring={SIGNAL.yellow} />
+                  <ConfigAvatar config={sampleAvatars["toon-head"]} size="md" ring={SIGNAL.red} />
+                </div>
+              </div>
+            </Card>
+          </Section>
+
           <Section title="Ambient glow · recovery bands">
             <SegmentedControl
               ariaLabel="Recovery band"

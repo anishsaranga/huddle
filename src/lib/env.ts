@@ -23,6 +23,8 @@ const schema = z.object({
     z.enum(["trace", "debug", "info", "warn", "error", "fatal"]),
     "info",
   ),
+  /** Uploaded avatar photos. Default ./data/avatars (dev) or /data/avatars (production). */
+  AVATAR_DIR: optional(z.string()),
   INGEST_LOG_RETENTION_DAYS: withDefault(z.coerce.number().int().positive(), 90),
   NODE_ENV: withDefault(z.enum(["development", "production", "test"]), "development"),
 });

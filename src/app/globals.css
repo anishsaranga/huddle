@@ -265,6 +265,48 @@ button {
   }
 }
 
+/* Avatar stage: idle float, its floor shadow, and the slow reticle spin. */
+@keyframes avatar-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.012);
+  }
+}
+
+@keyframes avatar-floor {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scaleX(0.86);
+    opacity: 0.6;
+  }
+}
+
+@keyframes reticle-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-avatar-float {
+  animation: avatar-float 4.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-avatar-floor {
+  animation: avatar-floor 4.2s ease-in-out infinite;
+}
+
+.animate-reticle {
+  animation: reticle-spin 90s linear infinite;
+}
+
 .animate-breathe {
   animation: glow-breathe 6s ease-in-out infinite;
   transform-origin: 50% 0%;
@@ -288,7 +330,10 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .animate-breathe,
   .animate-dot-pulse,
-  .animate-shimmer {
+  .animate-shimmer,
+  .animate-avatar-float,
+  .animate-avatar-floor,
+  .animate-reticle {
     animation: none;
   }
   .animate-dot-pulse {

@@ -7,7 +7,7 @@
 /** Auth.js session cookie names (plain in dev, `__Secure-` over HTTPS/prod). */
 export const SESSION_COOKIE_NAMES = ["authjs.session-token", "__Secure-authjs.session-token"];
 
-const PUBLIC_EXACT = new Set(["/login", "/denied", "/install", "/manifest.webmanifest", "/favicon.ico"]);
+const PUBLIC_EXACT = new Set(["/login", "/denied", "/install", "/credits", "/manifest.webmanifest", "/favicon.ico"]);
 
 const PUBLIC_PREFIXES = [
   "/api/auth/", // Auth.js endpoints (sign-in, callback, sign-out)

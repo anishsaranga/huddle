@@ -75,3 +75,18 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
 ## Screenshots
 
 `MSYS_NO_PATHCONV=1 node scripts/snap.mjs /login .snaps 2500` (iPhone 15 viewport, against :3000).
+
+## Avatars
+
+- DiceBear v9 (`@dicebear/core` + `@dicebear/collection`, rendered locally, no HTTP). Curated styles, their
+  licenses and the per-style option schema live in `src/lib/avatar/styles.ts`; `tests/unit/avatar-styles.test.ts`
+  checks every curated option against the installed collection schema (run it after upgrading DiceBear).
+- Stored config (`users.avatar_config`): `{ v: 1, style, seed, options }`, validated by `AvatarConfigSchema`
+  (`src/lib/avatar/config.ts`). Rendering: `src/lib/avatar/render.ts`.
+- `<Avatar>` (`components/ui/Avatar.tsx`) never imports the DiceBear styles (~430 KB gz): user avatars load from
+  `GET /api/avatar/:userId?v=<config hash>` (immutable cache). `<ConfigAvatar>` renders a config locally
+  (customizer, previews, server components). The customizer is `components/avatar/AvatarCustomizer.tsx`
+  (showcase at `/dev/ui#avatars`).
+- `/api/avatar/:userId` needs a session; `?format=png&size=16..1024` rasterizes with sharp. Uploads are read from
+  `AVATAR_DIR` (default `./data/avatars` in dev, `/data/avatars` in production).
+- `/credits` lists each style's license and attribution (public).

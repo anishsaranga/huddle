@@ -35,13 +35,15 @@ type StaggerItemProps = {
   children: ReactNode;
   className?: string;
   as?: "div" | "li" | "section";
+  /** DOM id (e.g. an in-page anchor). */
+  id?: string;
 };
 
 /** One step of a <Stagger>: rises 12px and fades in. */
-export function StaggerItem({ children, className, as = "div" }: StaggerItemProps) {
+export function StaggerItem({ children, className, as = "div", id }: StaggerItemProps) {
   const Comp = as === "li" ? motion.li : as === "section" ? motion.section : motion.div;
   return (
-    <Comp className={className} variants={itemVariants}>
+    <Comp id={id} className={className} variants={itemVariants}>
       {children}
     </Comp>
   );

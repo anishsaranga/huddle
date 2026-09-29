@@ -23,10 +23,16 @@ import type { AdapterAccountType } from "next-auth/adapters";
 
 export type AvatarKind = "dicebear" | "upload";
 export type Units = "metric" | "imperial";
+/**
+ * Stored DiceBear config. Mirrors `AvatarConfig` in src/lib/avatar/key.ts
+ * (kept inline so drizzle-kit can load this file without path aliases);
+ * always validate with `parseAvatarConfig()` before trusting it.
+ */
 export type AvatarConfig = {
+  v: 1;
   style: string;
   seed: string;
-  options?: Record<string, unknown>;
+  options: Record<string, string | number | boolean>;
 };
 
 const tstz = (name: string) => timestamp(name, { mode: "date", withTimezone: true });
