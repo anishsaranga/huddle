@@ -1,0 +1,24 @@
+# Dev database. web/worker services come in later tasks.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: huddle-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: huddle
+      POSTGRES_PASSWORD: huddle
+      POSTGRES_DB: huddle
+    ports:
+      # 5433 on the host: 5432 is commonly taken by other local projects.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - huddle-pgdata:/var/lib/postgresql/data
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huddle -d huddle"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  huddle-pgdata:
