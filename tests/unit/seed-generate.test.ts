@@ -13,6 +13,7 @@ import {
   simulateNight,
   type DemoUser,
   type ProfileId,
+  withTrackedNight,
 } from "../../scripts/seed/generate";
 import { checkDevDatabase, checkSeedTarget, isSeedableDatabase } from "../../scripts/seed/guard";
 
@@ -180,6 +181,19 @@ describe("payload generators", () => {
     const today = n.days.find((d) => d.date === to)!;
     expect((today.hrHourly ?? []).every((r) => r.hour < 5)).toBe(true);
     expect(n.nights.every((night) => night.wakeDate < to || night.wakeDate === to)).toBe(true);
+  });
+
+  it("withTrackedNight reseeds only when the night was untracked", () => {
+    const date = "2026-09-29";
+    const personas = Array.from({ length: 400 }, (_, i) => ({ ...user("watch"), email: `e2e-${i}@example.com` }));
+    const untracked = personas.filter((u) => !simulateNight(u, date));
+    expect(untracked.length).toBeGreaterThan(0); // ~4 % of nights are deliberately untracked
+    for (const u of personas) {
+      const t = withTrackedNight(u, date);
+      expect(simulateNight(t, date)).not.toBeNull();
+      expect({ ...t, email: u.email }).toEqual(u);
+      if (!untracked.includes(u)) expect(t).toBe(u);
+    }
   });
 });
 

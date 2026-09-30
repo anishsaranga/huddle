@@ -345,6 +345,22 @@ export function simulateNight(u: DemoUser, wakeDate: string): Night | null {
   return { wakeDate, bedMs, wakeMs, sleepStartMs, sleepEndMs, stages: merged };
 }
 
+/**
+ * `u` reseeded (if needed) so that the night ending on the morning of
+ * `wakeDate` was tracked. Every value comes from a PRNG seeded with the
+ * email, and a few percent of nights are deliberately untracked (see
+ * `simulateNight`), so a test that makes up a fresh email per run would
+ * otherwise get "no sleep last night" on ~4 % of runs. The returned email is
+ * only a seed (payloads never carry it); everything else is unchanged.
+ */
+export function withTrackedNight(u: DemoUser, wakeDate: string): DemoUser {
+  for (let i = 0; i < 1000; i++) {
+    const seeded = i === 0 ? u : { ...u, email: `${u.email}#${i}` };
+    if (simulateNight(seeded, wakeDate)) return seeded;
+  }
+  throw new Error(`withTrackedNight: no tracked night for ${u.email} on ${wakeDate}`);
+}
+
 export type DayPlan = {
   date: string;
   sick: boolean;
