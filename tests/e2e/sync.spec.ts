@@ -27,7 +27,7 @@ async function ingest(baseURL: string, key: string, body: unknown): Promise<numb
     extraHTTPHeaders: { "x-forwarded-for": `203.0.113.${Math.floor(Math.random() * 250) + 1}` },
   });
   try {
-    const res = await api.post("/api/ingest", { headers: { authorization: `Bearer ${key}` }, data: body });
+    const res = await api.post("/api/ingest", { headers: { authorization: `Bearer ${key}` }, data: body, maxRetries: 3 });
     return res.status();
   } finally {
     await api.dispose();

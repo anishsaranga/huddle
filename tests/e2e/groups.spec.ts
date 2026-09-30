@@ -36,8 +36,9 @@ test("community: group list, Info, a strain podium, Day/Week in the URL, and 404
   await expect(card).toBeVisible();
   await expect(card).toHaveAccessibleName(/3 of 3 synced today/);
   await card.click();
+  // Destination heading first (the first hit compiles the route), then the URL.
+  await expect(page.getByRole("heading", { name: groupName, level: 1 })).toBeVisible({ timeout: 15_000 });
   await expect(page).toHaveURL(new RegExp(`/groups/${groupId}$`));
-  await expect(page.getByRole("heading", { name: groupName, level: 1 })).toBeVisible();
 
   // Info: every member is listed with today's scores.
   const info = page.getByRole("tabpanel", { name: "Info" });

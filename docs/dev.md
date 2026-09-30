@@ -41,8 +41,22 @@ npm run dev                 # http://localhost:3000
 
 | Command | What |
 | --- | --- |
-| `npm test` | Vitest: `unit` project (pure) + `integration` project (real Postgres `huddle_test`; migrated in global setup, all tables truncated before each test). Override the DB with `TEST_DATABASE_URL`; its name must end in `_test` or `_test_<slot>` (e.g. `huddle_test_w0b` for a parallel checkout). |
-| `npm run test:e2e` | Playwright (iPhone 15, Chromium). Starts its **own** `next dev` on **:3200** with `E2E_AUTH=1`, `DATABASE_URL=huddle_test`, empty Google creds and `NEXT_DIST_DIR=.next-e2e` (so it can run next to the :3000 dev server; Next 16 locks each dist dir). Reuses a running :3200 server locally. |
+| `npm test` | Vitest: `unit` project (pure) + `integration` project (real Postgres `huddle_test`; migrated in global setup, all tables truncated before each test). Override the DB with `TEST_DATABASE_URL`; its name must be `huddle_test` or `huddle_test_<slot>`. |
+| `npm run test:e2e` | Playwright (iPhone 15, Chromium). Starts its **own** `next dev` on **:3200** (override with `E2E_PORT`) with `E2E_AUTH=1`, `DATABASE_URL=$TEST_DATABASE_URL` (default `huddle_test`), empty Google creds and `NEXT_DIST_DIR=.next-e2e-<port>` (so it can run next to the :3000 dev server; Next 16 locks each dist dir). Global setup migrates the DB and truncates every app table, so each run starts clean and tests create their own data. Reuses a running server on that port locally. `expect` waits 15 s (a cold `next dev` compiles routes on first hit). |
+
+### Running tests in parallel
+
+Two checkouts/worktrees (or agents) running the suites at once would share `huddle_test` (truncated between tests and at e2e start) and
+port :3200. Give each its own database and port:
+
+```sh
+npm run db:test:create -- a        # creates + migrates huddle_test_a (slot: [a-z0-9_]{1,20}); prints the URL
+TEST_DATABASE_URL=postgres://huddle:huddle@localhost:5433/huddle_test_a npm test
+TEST_DATABASE_URL=postgres://huddle:huddle@localhost:5433/huddle_test_a E2E_PORT=3210 npm run test:e2e
+```
+
+`E2E_PORT` (default 3200) sets the e2e server port and its dist dir `.next-e2e-<port>`. `assertTestDatabase` only accepts
+`huddle_test` and `huddle_test_<slot>`. E2E tests must create the data they need; the e2e global setup empties the database.
 
 ### E2E login bypass (`POST /api/test/login`)
 
@@ -107,7 +121,7 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
   `${AVATAR_DIR}/${userId}-${hash}.webp`, deletes the previous file and sets `avatar_kind='upload'`. Switching back to a character
   deletes the photo. HEIC that sharp can't decode returns a friendly 422.
 - `/profile` cards open edit sheets (`components/profile/EditSheets.tsx`) built from the same field components as onboarding
-  (`components/profile/fields.tsx`). The Playwright web server uses `AVATAR_DIR=.next-e2e/avatars`.
+  (`components/profile/fields.tsx`). The Playwright web server uses `AVATAR_DIR=.next-e2e-<port>/avatars`.
 - `ConnectStep` takes a `keySlot` prop (`OnboardingFlow`'s `connectKeySlot`); the onboarding page passes `<OnboardingKey>`, which creates the first API key when the final step mounts.
 
 ## API keys and health data
@@ -204,14 +218,3 @@ Huddle's own formulas, all pure and documented at the top of each file: `sleep.t
 - Membership is checked in `groups/[id]/layout.tsx` (outside the page's loading boundary, so non-members and unknown ids get a real 404 status) and again in the page (`memberGroup`, React-`cache`d). The list's skeleton lives in `groups/(list)/` so it doesn't wrap `[id]`.
 - URL state: `?tab=info|chat|strain|recovery|sleep&period=day|week&date=YYYY-MM-DD` (defaults omitted; the default date is the group date). Tab changes use `history.replaceState` (no server round trip); period/date changes use `router.replace(…, { scroll: false })` in a transition with optimistic controls, so the page stays mounted and values count from the previous board.
 - UI: `src/components/groups/*` (`GroupScreen` shell with `TopTabs fill`, `InfoPanel` + member sheet, `Leaderboard` with `Podium`, rows and the pinned "YOUR RANK" bar, `ChatPlaceholder` = the chat slot T7.1 replaces).
-
-## Worker (`src/worker/`)
-
-Background jobs run in a separate process: `npm run worker` (or `npm run worker:dev`, `tsx watch`). It reads `.env`, and needs `DATABASE_URL`.
-
-- **One worker at a time.** On start it takes a Postgres *session* advisory lock (`WORKER_LOCK_KEY` in `lock.ts`) on a dedicated connection. If another worker holds it, it logs "another worker holds the lock" and retries every 30 s; the same 30 s tick checks that the lock connection is still alive (if it dropped, jobs stop and it re-acquires). The lock is freed when the process exits or the connection closes.
-- **Jobs**: `src/worker/jobs/index.ts` exports the `jobs` array (`{ name, cron, run(ctx), runOnStart? }`). `WORKER_EXAMPLE_JOB=1` adds a no-op `example` job (every minute) to watch the worker tick. `ctx` is `{ db, log, now }`; use `ctx.now()` instead of `new Date()` so tests can inject the clock.
-- **Cron is server-local time**, not UTC (node-cron uses the process timezone, or `TZ`). Jobs that depend on a group's or user's timezone should run often (e.g. hourly) and work out what is due from `ctx.now()` and `groups.timezone` / `users.timezone`.
-- **Runner** (`registry.ts`): every run upserts a `worker_heartbeats` row (`last_run_at` at start, then `last_ok_at` and a cleared `last_error`, or `last_error`), logs the duration, never lets a job's error escape, and skips a tick while the same job is still running. `runJob(name)` triggers a job by hand (future admin button); `createJobRegistry({ db, log, now })` builds an isolated registry for tests. `getWorkerStatus(db)` (`src/lib/admin/worker.ts`) returns the heartbeat rows.
-- **Shutdown**: SIGINT / SIGTERM stop the crons, wait up to 15 s for running jobs, release the lock and close the DB.
-- **Bundling later (esbuild)**: keep `src/worker/**` and what it imports free of `next/*` and `server-only`. Today it only pulls `@/db`, `@/lib/env`, `@/lib/log` and `@/db/schema`. If a shared module ever needs `server-only`, alias `server-only` to an empty module in the bundler (the package's own `react-server` condition already resolves it to an empty file; plain Node/tsx would throw), and never import it from the worker entry directly.

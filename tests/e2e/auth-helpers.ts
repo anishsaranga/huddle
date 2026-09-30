@@ -10,6 +10,8 @@ export async function loginAs(
   opts: { onboarded?: boolean; name?: string } = {},
 ) {
   const res = await page.request.post("/api/test/login", {
+    // The dev server occasionally resets a pooled keep-alive socket; the login is idempotent, so retry.
+    maxRetries: 3,
     data: { email, name: opts.name ?? "E2E User", onboarded: opts.onboarded ?? true },
   });
   expect(res.status(), "test login bypass must be enabled (E2E_AUTH=1)").toBe(200);

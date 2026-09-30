@@ -130,7 +130,7 @@ test("username feedback: reserved, taken, and refresh resumes at the first incom
   const takenId = stamp();
   const ownerEmail = `own-${takenId}@example.com`;
   // A separate API context: its session cookie never reaches the page under test.
-  await request.post("/api/test/login", { data: { email: ownerEmail, name: "Owner", onboarded: true } });
+  await request.post("/api/test/login", { maxRetries: 3, data: { email: ownerEmail, name: "Owner", onboarded: true } });
   const ownerUsername = ownerEmail.split("@")[0].replace(/[^a-z0-9_]/g, "_").slice(0, 24);
 
   const { username } = await startOnboarding(page);

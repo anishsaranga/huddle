@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
+    "db:test:create": "tsx scripts/test-db.ts",
     "db:seed": "tsx scripts/seed-dev.ts",
     "scores:recompute": "tsx scripts/recompute-scores.ts",
     "worker": "tsx src/worker/index.ts",

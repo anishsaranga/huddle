@@ -110,9 +110,9 @@ test.describe("admin", () => {
       await create.getByLabel("Timezone").selectOption("Europe/Berlin");
       await create.getByRole("button", { name: "Create group" }).click();
 
-      // Lands on the group page.
+      // Lands on the group page (wait for the destination's heading first: the first hit compiles the route).
+      await expect(page.getByRole("heading", { name: `Crew ${run}` })).toBeVisible({ timeout: 15_000 });
       await expect(page).toHaveURL(/\/admin\/groups\/[0-9a-f-]{36}$/);
-      await expect(page.getByRole("heading", { name: `Crew ${run}` })).toBeVisible();
       await expect(page.getByRole("main").getByText("Europe/Berlin")).toBeVisible();
       await expect(page.getByText("No members")).toBeVisible();
 

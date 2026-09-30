@@ -116,8 +116,9 @@ test.describe("admin", () => {
     await page.goto("/admin/data");
     await page.waitForLoadState("networkidle");
     await page.getByRole("link", { name: `Ingest log for ${NAME}` }).first().click();
+    // Destination heading first (the first hit compiles the route), then the URL.
+    await expect(page.getByRole("heading", { name: NAME })).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(new RegExp(`/admin/data/${userId}$`));
-    await expect(page.getByRole("heading", { name: NAME })).toBeVisible();
 
     const events = page.getByTestId("ingest-event");
     await expect(events).toHaveCount(25);

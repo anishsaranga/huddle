@@ -1,6 +1,7 @@
 node_modules/
 .next/
-.next-e2e/
+.next-e2e*/
+.next-build*/
 out/
 dist/
 coverage/
@@ -22,3 +23,4 @@ Thumbs.db
 *.pem
 .vercel
 npm-debug.log*
+.claude/worktrees/

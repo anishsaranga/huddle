@@ -84,7 +84,7 @@ export async function seedUser(
   try {
     const persona: DemoUser = withTrackedNight({ ...base, email, timezone: tz }, today);
     const body = buildPayload(persona, { from: addDays(today, -(days - 1)), to: today, now });
-    const res = await api.post("/api/ingest", { headers: { authorization: `Bearer ${key}` }, data: body });
+    const res = await api.post("/api/ingest", { headers: { authorization: `Bearer ${key}` }, data: body, maxRetries: 3 });
     expect(res.status(), await res.text()).toBe(200);
   } finally {
     await api.dispose();
