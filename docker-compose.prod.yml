@@ -1,0 +1,115 @@
+# Production stack for Huddle, served behind the Cloudflare Tunnel at
+# https://huddle.anishsaranga.com -> http://localhost:6060 (see DEPLOY.md).
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Independent of the dev docker-compose.yml: different project name, container
+# names and volumes, so it never touches the dev `huddle-db` (5433) container.
+# `--env-file .env.production` feeds ${...} interpolation here (POSTGRES_PASSWORD);
+# each app service also loads the same file via `env_file` for its own runtime env.
+name: huddle-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# web, worker and migrate are the same image (one build), different commands.
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: huddle-prod:latest
+  env_file:
+    - .env.production
+  environment: &app-env
+    NODE_ENV: production
+    # Reach Postgres over the compose network by service name.
+    DATABASE_URL: postgres://huddle:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}@db:5432/huddle
+    AVATAR_DIR: /data/avatars
+  logging: *logging
+
+services:
+  # -- PostgreSQL --------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: huddle-prod-db
+    restart: unless-stopped
+    # No `ports:` on purpose: only the other containers on this compose network
+    # can reach Postgres. Use `docker exec -it huddle-prod-db psql -U huddle` for shell access.
+    environment:
+      POSTGRES_USER: huddle
+      POSTGRES_DB: huddle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - huddle-prod-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huddle -d huddle"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # -- One-shot schema migration ---------------------------------------------
+  migrate:
+    <<: *app
+    container_name: huddle-prod-migrate
+    command: ["node", "dist/migrate.mjs"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # -- Next.js web app -------------------------------------------------------
+  web:
+    <<: *app
+    container_name: huddle-prod-web
+    # Loopback only: the Cloudflare Tunnel reaches it via localhost:6060 on the
+    # host. Never publish this to the LAN: rate limiting trusts the
+    # CF-Connecting-IP header, which anyone who can reach the port directly
+    # could forge to dodge the per-IP limits.
+    ports:
+      - "127.0.0.1:6060:6060"
+    volumes:
+      - huddle-prod-avatars:/data/avatars
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      # 127.0.0.1, not localhost: busybox wget resolves localhost to ::1 but the
+      # Next standalone server binds IPv4 only.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:6060/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 1.5
+    pids_limit: 256
+
+  # -- Background worker (cron jobs, holds a Postgres advisory lock) ---------
+  worker:
+    <<: *app
+    container_name: huddle-prod-worker
+    command: ["node", "dist/worker.mjs"]
+    volumes:
+      # Retention sweeps orphaned avatar files, so the worker needs the same volume.
+      - huddle-prod-avatars:/data/avatars
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+
+volumes:
+  # Explicit names (otherwise compose prefixes them with the project name).
+  huddle-prod-pgdata:
+    name: huddle-prod-pgdata
+  huddle-prod-avatars:
+    name: huddle-prod-avatars

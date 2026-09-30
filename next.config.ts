@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // Keep the dev "N" badge from overlapping the tab bar during reviews.
   devIndicators: false,
+  // Self-contained server bundle (.next/standalone) for the slim production Docker image.
+  output: "standalone",
   // pino/pino-pretty are already auto-externalized by Next; listed explicitly for clarity.
   serverExternalPackages: ["pino", "pino-pretty", "postgres"],
   // Baseline security headers on every route. HSTS is safe because the app is

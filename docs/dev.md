@@ -286,3 +286,10 @@ Huddle's own formulas, all pure and documented at the top of each file: `sleep.t
 - Live: `GET /api/groups/:id/stream` (SSE; members only, 404 otherwise). One shared LISTEN connection per process (postgres.js `sql.listen`, `lib/chat/hub.ts`) with an in-memory subscriber set per group. Format and replay rules in `lib/chat/stream.ts`: `retry: 3000`, heartbeat comment every 25 s, message events carry the message id as SSE id, `Last-Event-ID` or `?after=` replays newer message ids from the DB before live events (`reset` when > 200 were missed). Payloads are ids only; the client refetches (`?ids=`). `Cache-Control: no-transform` keeps Next's gzip (and proxies) from buffering it.
 - Client (`components/chat/*`): pure reducer in `store.ts` (dedupe by id, pending sends keep their React key), timeline grouping in `lib/chat/timeline.ts` (author groups break on a 5-minute gap; day separators in the viewer's timezone), `useGroupStream` (EventSource; closed while hidden, reopened with `?after=` on `visibilitychange` / `online`, resync of the newest page after a reconnect). The panel fills the space above the tab bar and scrolls inside; the composer is portaled `position: fixed` above the tab bar, or above the keyboard via `visualViewport`. Long-press / right-click opens `MessageMenu` (reactions, Copy, Delete). The Chat tab's unread badge comes from the last-read id in localStorage (`huddle:chat:lastRead:<user>:<group>`), reported through `ChatTabContext`.
 - Tests: `tests/unit/chat-*.test.ts`, `tests/integration/chat.test.ts` (service, NOTIFY payloads, the SSE route read as a stream), `tests/e2e/chat.spec.ts` (two sessions).
+
+## Production
+
+`Dockerfile` (web, worker and migrate share one image), `docker-compose.prod.yml`, `.env.production.example` and `DEPLOY.md` cover
+the homelab deployment. `npm run build:extras` (`scripts/build-server-extras.mjs`, esbuild) bundles `dist/worker.mjs` and
+`dist/migrate.mjs`; only `sharp` and `pg-native` stay external. Keep `src/worker` and `scripts/migrate.ts` free of `next/*` and
+`server-only` imports (the latter is shimmed, the former would not bundle).
