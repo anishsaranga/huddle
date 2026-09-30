@@ -1,8 +1,5 @@
-"use client";
-
-import { motion, type Variants } from "motion/react";
-import type { ReactNode } from "react";
-import { spring, STAGGER } from "@/lib/ui/motion";
+import type { CSSProperties, ReactNode } from "react";
+import { STAGGER } from "@/lib/ui/motion";
 
 type StaggerProps = {
   children: ReactNode;
@@ -13,23 +10,22 @@ type StaggerProps = {
   className?: string;
 };
 
-/** Container that reveals its <StaggerItem> children one after another. */
-export function Stagger({ children, delay = 0, stagger = STAGGER, className }: StaggerProps) {
-  const variants: Variants = {
-    hidden: {},
-    show: { transition: { delayChildren: delay, staggerChildren: stagger } },
-  };
+/**
+ * Container that reveals its <StaggerItem> children one after another.
+ *
+ * Pure CSS (see `.stagger-item` in globals.css), so it works as a server
+ * component: the HTML is visible with no JavaScript, and the entrance starts as
+ * soon as the stylesheet applies rather than after hydration (no flash of
+ * hidden content, nothing stuck invisible if the JS bundle is slow or fails).
+ */
+export function Stagger({ children, delay = 0, stagger = STAGGER, className = "" }: StaggerProps) {
+  const style = { "--stagger-delay": `${delay}s`, "--stagger-step": `${stagger}s` } as CSSProperties;
   return (
-    <motion.div className={className} variants={variants} initial="hidden" animate="show">
+    <div className={`stagger ${className}`} style={style}>
       {children}
-    </motion.div>
+    </div>
   );
 }
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { ...spring.soft, opacity: { duration: 0.35 } } },
-};
 
 type StaggerItemProps = {
   children: ReactNode;
@@ -37,13 +33,18 @@ type StaggerItemProps = {
   as?: "div" | "li" | "section";
   /** DOM id (e.g. an in-page anchor). */
   id?: string;
+  /**
+   * Position in the sequence. Defaults to the item's place among its siblings
+   * (CSS :nth-child); set it when items are split across wrapper elements.
+   */
+  index?: number;
 };
 
 /** One step of a <Stagger>: rises 12px and fades in. */
-export function StaggerItem({ children, className, as = "div", id }: StaggerItemProps) {
-  const Comp = as === "li" ? motion.li : as === "section" ? motion.section : motion.div;
+export function StaggerItem({ children, className = "", as: Comp = "div", id, index }: StaggerItemProps) {
+  const style = index === undefined ? undefined : ({ "--i": index } as CSSProperties);
   return (
-    <Comp id={id} className={className} variants={itemVariants}>
+    <Comp id={id} className={`stagger-item ${className}`} style={style}>
       {children}
     </Comp>
   );

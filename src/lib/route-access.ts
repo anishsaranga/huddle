@@ -7,7 +7,19 @@
 /** Auth.js session cookie names (plain in dev, `__Secure-` over HTTPS/prod). */
 export const SESSION_COOKIE_NAMES = ["authjs.session-token", "__Secure-authjs.session-token"];
 
-const PUBLIC_EXACT = new Set(["/login", "/denied", "/install", "/credits", "/manifest.webmanifest", "/favicon.ico"]);
+const PUBLIC_EXACT = new Set([
+  "/login",
+  "/denied",
+  "/install",
+  "/offline", // service-worker fallback; no user data
+  "/credits",
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/favicon.ico",
+  // Link-preview images: crawlers (iMessage, Slack, WhatsApp…) have no session.
+  "/opengraph-image",
+  "/twitter-image",
+]);
 
 const PUBLIC_PREFIXES = [
   "/api/auth/", // Auth.js endpoints (sign-in, callback, sign-out)
@@ -15,6 +27,7 @@ const PUBLIC_PREFIXES = [
   "/api/ingest", // authenticated by API key, not by session
   "/api/test/", // e2e-only routes; they 404 unless explicitly enabled
   "/icons/",
+  "/splash/", // apple-touch-startup-image PNGs
 ];
 
 function matchesPrefix(pathname: string, prefix: string): boolean {

@@ -352,6 +352,124 @@ button {
   }
 }
 
+/* ---------- Entrances (CSS-only: content is visible without JS) ----------
+   Used by <Stagger>/<StaggerItem> and the (app) page template. The "backwards"
+   fill applies the hidden start state only during the delay, so once finished
+   the element is untouched (no lingering transform / stacking context). */
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes enter-rise-12 {
+  from {
+    transform: translateY(12px);
+  }
+}
+@keyframes enter-rise-8 {
+  from {
+    transform: translateY(8px);
+  }
+}
+
+.stagger-item {
+  animation:
+    enter-fade 0.35s ease-out backwards,
+    enter-rise-12 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--stagger-delay, 0s) + var(--i, 0) * var(--stagger-step, 0.055s));
+}
+.stagger-item:nth-child(1) {
+  --i: 0;
+}
+.stagger-item:nth-child(2) {
+  --i: 1;
+}
+.stagger-item:nth-child(3) {
+  --i: 2;
+}
+.stagger-item:nth-child(4) {
+  --i: 3;
+}
+.stagger-item:nth-child(5) {
+  --i: 4;
+}
+.stagger-item:nth-child(6) {
+  --i: 5;
+}
+.stagger-item:nth-child(7) {
+  --i: 6;
+}
+.stagger-item:nth-child(8) {
+  --i: 7;
+}
+.stagger-item:nth-child(9) {
+  --i: 8;
+}
+.stagger-item:nth-child(10) {
+  --i: 9;
+}
+.stagger-item:nth-child(11) {
+  --i: 10;
+}
+.stagger-item:nth-child(12) {
+  --i: 11;
+}
+.stagger-item:nth-child(13) {
+  --i: 12;
+}
+.stagger-item:nth-child(14) {
+  --i: 13;
+}
+.stagger-item:nth-child(15) {
+  --i: 14;
+}
+.stagger-item:nth-child(16) {
+  --i: 15;
+}
+.stagger-item:nth-child(17) {
+  --i: 16;
+}
+.stagger-item:nth-child(18) {
+  --i: 17;
+}
+.stagger-item:nth-child(19) {
+  --i: 18;
+}
+.stagger-item:nth-child(20) {
+  --i: 19;
+}
+.stagger-item:nth-child(n + 21) {
+  --i: 20;
+}
+
+/* Huddle mark: each ring sweeps in from 12 o'clock (pathLength is normalised to 1). */
+@keyframes mark-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+.mark-ring {
+  stroke-dasharray: 1;
+  animation:
+    mark-draw 1.15s cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    enter-fade 0.2s ease-out backwards;
+  animation-delay: var(--mark-delay, 0s);
+}
+
+.page-enter {
+  animation:
+    enter-fade 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    enter-rise-8 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-item,
+  .page-enter,
+  .mark-ring {
+    animation-name: enter-fade;
+  }
+}
+
 /* ---------- Range slider (goals) ---------- */
 .range {
   -webkit-appearance: none;

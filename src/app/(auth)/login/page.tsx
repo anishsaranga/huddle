@@ -3,13 +3,19 @@ import { redirect } from "next/navigation";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { HuddleMark } from "@/components/brand/HuddleMark";
+import { InstallHint } from "@/components/pwa/InstallHint";
 import { AmbientGlow } from "@/components/ui/AmbientGlow";
 import { Stagger, StaggerItem } from "@/components/ui/Stagger";
 import { getCurrentUser } from "@/lib/session";
+import { publicPageMetadata } from "@/lib/site";
 import { SIGNAL } from "@/lib/ui/colors";
 import { signInWithGoogle } from "../actions";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = publicPageMetadata({
+  title: "Sign in",
+  description: "Sign in to Huddle, the private group for recovery, strain and sleep. Invite only.",
+  path: "/login",
+});
 
 /** Auth.js error codes (and our own "Configuration") → human copy. */
 function errorCopy(code: string | undefined): string | null {
@@ -34,7 +40,7 @@ export default async function LoginPage({
       <AmbientGlow color={SIGNAL.strain} intensity={0.9} />
 
       <Stagger className="flex flex-1 flex-col" delay={0.05} stagger={0.09}>
-        <StaggerItem className="flex items-center justify-between pt-5">
+        <StaggerItem index={0} className="flex items-center justify-between pt-5">
           <span className="telemetry flex items-center gap-2">
             <span className="relative inline-flex size-1.5">
               <span className="animate-dot-pulse absolute inset-0 rounded-full bg-recovery-green" />
@@ -46,20 +52,20 @@ export default async function LoginPage({
         </StaggerItem>
 
         <div className="flex flex-1 flex-col justify-center py-10">
-          <StaggerItem>
+          <StaggerItem index={1}>
             <HuddleMark size={112} delay={0.15} className="-ml-2 mb-9" />
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem index={2}>
             <h1 className="font-display text-[96px] font-bold uppercase leading-[0.82] tracking-[0.01em]">
               Huddle
             </h1>
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem index={3}>
             <p className="mt-5 max-w-[20rem] text-[17px] leading-snug text-text-2">
               Recovery, strain and sleep. Measured together, with your people.
             </p>
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem index={4}>
             <ul aria-label="Tracks" className="mt-9 grid grid-cols-3 gap-3 border-t border-hairline pt-4">
               {[
                 { label: "Recovery", color: SIGNAL.green },
@@ -75,7 +81,7 @@ export default async function LoginPage({
           </StaggerItem>
         </div>
 
-        <StaggerItem className="pb-6">
+        <StaggerItem index={5} className="pb-6">
           {wasDeleted && (
             <p
               role="status"
@@ -103,6 +109,7 @@ export default async function LoginPage({
           <p className="mt-4 text-center text-[13px] leading-relaxed text-muted">
             Not in the group yet? Ask the admin to add your email.
           </p>
+          <InstallHint />
         </StaggerItem>
       </Stagger>
     </>

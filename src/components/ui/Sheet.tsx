@@ -15,6 +15,9 @@ type SheetProps = {
 
 const subscribe = () => () => {};
 
+/** Open sheets, oldest first: Escape closes only the last (topmost) one. */
+const openStack: symbol[] = [];
+
 /**
  * Bottom sheet. Drag the grabber/header down to dismiss (distance or flick
  * velocity), tap the backdrop, or press Escape. Content scrolls inside;
@@ -30,19 +33,30 @@ export function Sheet({ open, onClose, title, children, className = "" }: SheetP
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Keep the latest onClose without re-running the effect below: re-running it would
+  // re-push this sheet onto the stack and change which sheet counts as topmost.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
+    const me = Symbol("sheet");
+    openStack.push(me);
     const prev = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && openStack[openStack.length - 1] === me) onCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
+      const i = openStack.indexOf(me);
+      if (i !== -1) openStack.splice(i, 1);
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!mounted) return null;
 

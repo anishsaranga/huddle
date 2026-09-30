@@ -26,20 +26,20 @@ export default function DeniedPage() {
         </StaggerItem>
 
         <div className="flex flex-1 flex-col justify-center py-10">
-          <StaggerItem>
+          <StaggerItem index={1}>
             <p className="telemetry mb-4">Invite only</p>
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem index={2}>
             <h1 className="font-display text-[64px] font-bold uppercase leading-[0.86] tracking-[0.01em]">
               You&rsquo;re not on the list
             </h1>
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem index={3}>
             <p className="mt-6 text-[20px] font-medium leading-snug text-text">
               Ask the admin to add you.
             </p>
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem index={4}>
             <Card className="mt-8" padding="p-4">
               <p className="text-[14px] leading-relaxed text-muted">
                 Huddle is a private group. Once your email is on the allowlist, sign in with that same
@@ -49,7 +49,7 @@ export default function DeniedPage() {
           </StaggerItem>
         </div>
 
-        <StaggerItem className="space-y-2 pb-6">
+        <StaggerItem index={5} className="space-y-2 pb-6">
           <form action={switchAccount}>
             <SubmitButton variant="secondary" size="lg" fullWidth>
               Try another account

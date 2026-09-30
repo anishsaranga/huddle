@@ -1,8 +1,5 @@
-"use client";
-
-import { motion } from "motion/react";
+import type { CSSProperties } from "react";
 import { SIGNAL } from "@/lib/ui/colors";
-import { spring } from "@/lib/ui/motion";
 
 /** Same geometry as public/icons/icon.svg (512 box), without the background. */
 const RINGS = [
@@ -13,7 +10,7 @@ const RINGS = [
 
 type HuddleMarkProps = {
   size?: number;
-  /** Draw the rings in (staggered stroke sweep) on mount. */
+  /** Draw the rings in (staggered stroke sweep) on load. */
   animate?: boolean;
   /** Seconds before the first ring starts. */
   delay?: number;
@@ -22,7 +19,9 @@ type HuddleMarkProps = {
 
 /**
  * The three-ring Huddle mark: recovery, strain and sleep overlapping.
- * Rings sweep in one after another like the overview dials.
+ * Rings sweep in one after another like the overview dials. The sweep is a CSS
+ * animation (`.mark-ring`, globals.css) so the rings are in the server HTML and
+ * stay visible if JavaScript is slow or missing.
  */
 export function HuddleMark({ size = 96, animate = true, delay = 0, className = "" }: HuddleMarkProps) {
   return (
@@ -35,7 +34,7 @@ export function HuddleMark({ size = 96, animate = true, delay = 0, className = "
       className={`overflow-visible ${className}`}
     >
       {RINGS.map((r, i) => (
-        <motion.circle
+        <circle
           key={i}
           cx={r.cx}
           cy={r.cy}
@@ -43,15 +42,11 @@ export function HuddleMark({ size = 96, animate = true, delay = 0, className = "
           fill="none"
           strokeWidth={34}
           strokeLinecap="round"
-          // Start each sweep at 12 o'clock.
+          // Normalised length so the dash sweep is one unit; start each sweep at 12 o'clock.
+          pathLength={1}
           transform={`rotate(-90 ${r.cx} ${r.cy})`}
-          style={{ stroke: r.color }}
-          initial={animate ? { pathLength: 0, opacity: 0 } : false}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{
-            pathLength: { ...spring.dial, delay: delay + i * 0.12 },
-            opacity: { duration: 0.2, delay: delay + i * 0.12 },
-          }}
+          className={animate ? "mark-ring" : undefined}
+          style={{ stroke: r.color, ...(animate ? ({ "--mark-delay": `${delay + i * 0.12}s` } as CSSProperties) : null) }}
         />
       ))}
     </svg>

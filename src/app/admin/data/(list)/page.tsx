@@ -1,10 +1,10 @@
 import { db } from "@/db";
 import { getCoverage, getIngestOverview, getSleepSources, getUnknownFields, LOOKBACK_DAYS } from "@/lib/admin/data";
 import { requireAdmin } from "@/lib/session";
-import { SectionHeader } from "../_components/SectionHeader";
-import { CoverageGrid } from "./_components/CoverageGrid";
-import { IngestLogLinks, SleepSources, UnknownFields } from "./_components/Panels";
-import { DataSection } from "./_components/UserBits";
+import { SectionHeader } from "../../_components/SectionHeader";
+import { CoverageGrid } from "../_components/CoverageGrid";
+import { IngestLogLinks, SleepSources, UnknownFields } from "../_components/Panels";
+import { DataSection } from "../_components/UserBits";
 
 export const metadata = { title: "Data · Admin" };
 

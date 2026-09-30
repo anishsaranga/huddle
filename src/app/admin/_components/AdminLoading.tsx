@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/Skeleton";
 
-export default function AdminLoading() {
+export function AdminLoading() {
   return (
     <div aria-busy="true" aria-label="Loading">
       <Skeleton className="mb-3 h-3 w-24" />

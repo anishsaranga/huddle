@@ -9,6 +9,8 @@ import { ease } from "@/lib/ui/motion";
 export type OrbMode = "calm" | "dormant" | "busy" | "burst" | "alert";
 
 const SIZE = 264;
+/** Rendered at this fraction of SIZE so the Sync screen's stats card fits above the tab bar on an iPhone. */
+const SCALE = 0.8;
 const C = SIZE / 2;
 const TICKS = 72;
 const CORE_R = 80;
@@ -128,93 +130,99 @@ export function SyncOrb({ mode, color, burstKey, children }: SyncOrbProps) {
     reduced ? {} : { animate: { rotate: dir * 360 }, transition: { duration: seconds, repeat: Infinity, ease: "linear" as const } };
 
   return (
-    <div className="relative mx-auto" style={{ width: SIZE, height: SIZE }} data-orb-mode={mode}>
-      {/* Glow */}
-      <motion.div
-        aria-hidden
-        className="absolute -inset-12 rounded-full"
-        animate={{ opacity: dormant ? 0.35 : busy ? 1 : 0.8, scale: busy ? 1.04 : 1 }}
-        transition={{ duration: 0.8, ease: ease.out }}
-        style={{ background: `radial-gradient(circle, ${alpha(color, 22)} 0%, ${alpha(color, 8)} 38%, transparent 66%)` }}
-      />
-
-      <Bezel color={color} lit={!dormant} />
-
-      <AnimatePresence>
-        {busy && (
-          <motion.div
-            key="comet"
-            className="absolute inset-0"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <motion.div className="absolute inset-0" {...spin(1.6)}>
-              <Comet color={color} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Track + two counter-rotating data rings */}
-      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="absolute inset-0" aria-hidden>
-        <circle cx={C} cy={C} r={108} fill="none" strokeWidth={1} style={{ stroke: "var(--hairline)" }} />
-      </svg>
-      <motion.div key={`r1-${busy}`} className="absolute inset-0" {...spin(busy ? 5 : 90)}>
-        <DataRing r={100} color={color} width={3} pattern={[46, 18, 64, 9, 30, 12]} opacity={dormant ? 0.18 : busy ? 0.95 : 0.55} />
-      </motion.div>
-      <motion.div key={`r2-${busy}`} className="absolute inset-0" {...spin(busy ? 8 : 140, -1)}>
-        <DataRing r={91} color={color} width={1.4} pattern={[0.5]} opacity={dormant ? 0.12 : busy ? 0.6 : 0.3} />
-      </motion.div>
-
-      {/* Success shockwaves */}
-      <AnimatePresence>
-        {mode === "burst" && !reduced && (
-          <motion.div key={`burst-${burstKey}`} className="pointer-events-none absolute inset-0" exit={{ opacity: 0 }}>
-            {[0, 0.14, 0.28].map((delay) => (
-              <motion.span
-                key={delay}
-                aria-hidden
-                className="absolute rounded-full"
-                style={{
-                  left: C - CORE_R,
-                  top: C - CORE_R,
-                  width: CORE_R * 2,
-                  height: CORE_R * 2,
-                  boxShadow: `0 0 0 2px ${color}, 0 0 24px ${alpha(color, 60)}`,
-                }}
-                initial={{ scale: 1, opacity: 0.9 }}
-                animate={{ scale: 1.75, opacity: 0 }}
-                transition={{ duration: 1.1, delay, ease: ease.outExpo }}
-              />
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Core */}
-      <motion.div
-        key={mode === "burst" ? `core-${burstKey}` : "core"}
-        className="absolute grid place-items-center rounded-full text-center"
-        style={{
-          left: C - CORE_R,
-          top: C - CORE_R,
-          width: CORE_R * 2,
-          height: CORE_R * 2,
-          background: `radial-gradient(circle at 50% 30%, ${alpha(color, dormant ? 6 : 16)} 0%, transparent 70%), linear-gradient(180deg, var(--card-elevated), var(--card-sunken))`,
-          boxShadow: `inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 0 0 1px ${alpha(color, dormant ? 14 : 34)}, 0 18px 40px -18px rgb(0 0 0 / 0.9), 0 0 36px -8px ${alpha(color, dormant ? 0 : 45)}`,
-        }}
-        initial={mode === "burst" && !reduced ? { scale: 0.9 } : false}
-        animate={
-          mode === "alert" && !reduced
-            ? { x: [0, -6, 6, -4, 4, 0], scale: 1 }
-            : { scale: 1, x: 0 }
-        }
-        transition={mode === "burst" ? { type: "spring", stiffness: 520, damping: 12 } : { duration: 0.45, ease: ease.out }}
+    <div className="relative mx-auto" style={{ width: SIZE * SCALE, height: SIZE * SCALE }}>
+      <div
+        className="absolute left-0 top-0"
+        style={{ width: SIZE, height: SIZE, transform: `scale(${SCALE})`, transformOrigin: "top left" }}
+        data-orb-mode={mode}
       >
-        <div className="px-4">{children}</div>
-      </motion.div>
+        {/* Glow */}
+        <motion.div
+          aria-hidden
+          className="absolute -inset-12 rounded-full"
+          animate={{ opacity: dormant ? 0.35 : busy ? 1 : 0.8, scale: busy ? 1.04 : 1 }}
+          transition={{ duration: 0.8, ease: ease.out }}
+          style={{ background: `radial-gradient(circle, ${alpha(color, 22)} 0%, ${alpha(color, 8)} 38%, transparent 66%)` }}
+        />
+
+        <Bezel color={color} lit={!dormant} />
+
+        <AnimatePresence>
+          {busy && (
+            <motion.div
+              key="comet"
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <motion.div className="absolute inset-0" {...spin(1.6)}>
+                <Comet color={color} />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Track + two counter-rotating data rings */}
+        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="absolute inset-0" aria-hidden>
+          <circle cx={C} cy={C} r={108} fill="none" strokeWidth={1} style={{ stroke: "var(--hairline)" }} />
+        </svg>
+        <motion.div key={`r1-${busy}`} className="absolute inset-0" {...spin(busy ? 5 : 90)}>
+          <DataRing r={100} color={color} width={3} pattern={[46, 18, 64, 9, 30, 12]} opacity={dormant ? 0.18 : busy ? 0.95 : 0.55} />
+        </motion.div>
+        <motion.div key={`r2-${busy}`} className="absolute inset-0" {...spin(busy ? 8 : 140, -1)}>
+          <DataRing r={91} color={color} width={1.4} pattern={[0.5]} opacity={dormant ? 0.12 : busy ? 0.6 : 0.3} />
+        </motion.div>
+
+        {/* Success shockwaves */}
+        <AnimatePresence>
+          {mode === "burst" && !reduced && (
+            <motion.div key={`burst-${burstKey}`} className="pointer-events-none absolute inset-0" exit={{ opacity: 0 }}>
+              {[0, 0.14, 0.28].map((delay) => (
+                <motion.span
+                  key={delay}
+                  aria-hidden
+                  className="absolute rounded-full"
+                  style={{
+                    left: C - CORE_R,
+                    top: C - CORE_R,
+                    width: CORE_R * 2,
+                    height: CORE_R * 2,
+                    boxShadow: `0 0 0 2px ${color}, 0 0 24px ${alpha(color, 60)}`,
+                  }}
+                  initial={{ scale: 1, opacity: 0.9 }}
+                  animate={{ scale: 1.75, opacity: 0 }}
+                  transition={{ duration: 1.1, delay, ease: ease.outExpo }}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Core */}
+        <motion.div
+          key={mode === "burst" ? `core-${burstKey}` : "core"}
+          className="absolute grid place-items-center rounded-full text-center"
+          style={{
+            left: C - CORE_R,
+            top: C - CORE_R,
+            width: CORE_R * 2,
+            height: CORE_R * 2,
+            background: `radial-gradient(circle at 50% 30%, ${alpha(color, dormant ? 6 : 16)} 0%, transparent 70%), linear-gradient(180deg, var(--card-elevated), var(--card-sunken))`,
+            boxShadow: `inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 0 0 1px ${alpha(color, dormant ? 14 : 34)}, 0 18px 40px -18px rgb(0 0 0 / 0.9), 0 0 36px -8px ${alpha(color, dormant ? 0 : 45)}`,
+          }}
+          initial={mode === "burst" && !reduced ? { scale: 0.9 } : false}
+          animate={
+            mode === "alert" && !reduced
+              ? { x: [0, -6, 6, -4, 4, 0], scale: 1 }
+              : { scale: 1, x: 0 }
+          }
+          transition={mode === "burst" ? { type: "spring", stiffness: 520, damping: 12 } : { duration: 0.45, ease: ease.out }}
+        >
+          <div className="px-4">{children}</div>
+        </motion.div>
+      </div>
     </div>
   );
 }

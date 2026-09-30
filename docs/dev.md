@@ -252,3 +252,27 @@ Huddle's own formulas, all pure and documented at the top of each file: `sleep.t
   deleted." The admin (`ADMIN_EMAIL` or `is_admin`) is refused; the Profile row is disabled for them. Logs carry the user id only.
 - **Perf assertion**: the 366-day backfill test in `tests/integration/ingest.test.ts` fails above 10 s by default (so it doesn't flake under
   parallel load); set `PERF_STRICT=1` for the real 3 s budget on an idle machine.
+
+## PWA, link previews and headers
+
+- **Link previews**: root metadata (`src/app/layout.tsx`, helpers in `src/lib/site.ts`) sets `metadataBase` from `APP_URL` (fallback
+  `http://localhost:3000`), OG/Twitter tags and `robots: noindex, nofollow`. Prerendered pages (`/offline`, `/credits`) bake `APP_URL` in at
+  build time, so build with it set; dynamic pages (`/login`, `/install`, app pages) read it per request. Next replaces a page's `openGraph`
+  object wholesale, so public pages use `publicPageMetadata()`, which repeats the shared fields and images. The card is
+  `src/app/opengraph-image.tsx` / `twitter-image.tsx` (1200x630, no user data; both are public in `route-access.ts`). Its fonts (Barlow
+  Condensed Bold, JetBrains Mono Medium; SIL OFL, licenses alongside) are bundled as TTF in `src/app/_og/` because `ImageResponse` can't use
+  next/font's woff2. When packaging, make sure `src/app/_og/*.ttf` are available at build (they are read at build time; the route is static).
+- **Service worker** (`public/sw.js`, registered by `components/pwa/ServiceWorkerRegistrar.tsx`, production only): precaches `/offline` and the
+  hashed assets it references, cache-first for `/_next/static/*`, `/icons/*` and fonts, network-first navigations with the `/offline` fallback
+  (also on 502/503/504/52x from the tunnel). It never caches `/api/*`, RSC payloads or any other HTML. Bump `VERSION` in `sw.js` to drop all
+  caches. A waiting worker shows an "Update available" toast; tapping it sends `SKIP_WAITING` and reloads. The app also asks the worker to
+  refresh the offline shell every 12 h. `next.config.ts` serves `/sw.js` with `no-cache`. To test offline: `next build`, `next start`, open
+  the app, stop the server, navigate (Playwright `serviceWorkers: "allow"`).
+- **Splash screens**: `npm run gen:splash` renders `public/splash/*.png` from `src/lib/pwa/splash.ts` (which also feeds
+  `appleWebApp.startupImage`). Add a device by adding a row there and re-running.
+- **/install** is public; it redirects to `/home` when launched standalone and adapts to iOS Safari / other iOS browsers / non-iOS
+  (`src/lib/pwa/platform.ts`, unit-tested). `/login` shows an "Install Huddle" link on iOS Safari outside the installed app.
+- **Security headers** (HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy) are set in `next.config.ts`; no CSP yet.
+- **Entrances** (`Stagger`, the `(app)` template, the Huddle mark) are CSS animations (`.stagger-item`, `.page-enter`, `.mark-ring` in
+  `globals.css`): content is in the server HTML and visible without JS. `StaggerItem` delays come from `:nth-child`; pass `index` when items are
+  split across wrapper elements.

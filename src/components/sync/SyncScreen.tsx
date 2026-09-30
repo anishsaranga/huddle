@@ -95,7 +95,7 @@ export function SyncScreen({ initial, hasKey, shortcutName, renderedAt }: SyncSc
       <AmbientGlow color={view.color} intensity={view.mode === "dormant" ? 0.45 : 0.8} />
 
       <header className="pt-safe px-safe">
-        <div className="flex items-end justify-between gap-4 px-5 pb-2 pt-6">
+        <div className="flex items-end justify-between gap-4 px-5 pb-2 pt-4">
           <div>
             <p className="telemetry mb-2">Apple Health · {shortcutName}</p>
             <h1 className="font-display text-[40px] font-bold uppercase leading-[0.9] tracking-[0.02em]">Sync</h1>
@@ -110,7 +110,7 @@ export function SyncScreen({ initial, hasKey, shortcutName, renderedAt }: SyncSc
       </header>
 
       <Stagger className="px-4" delay={0.05}>
-        <StaggerItem className="pt-4">
+        <StaggerItem className="pt-2">
           <SyncOrb mode={view.mode} color={view.color} burstKey={state.phase === "synced" ? state.at : undefined}>
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.div
@@ -137,7 +137,7 @@ export function SyncScreen({ initial, hasKey, shortcutName, renderedAt }: SyncSc
           </SyncOrb>
         </StaggerItem>
 
-        <StaggerItem className="pt-6 text-center">
+        <StaggerItem className="pt-4 text-center">
           <div aria-live="polite" data-testid="sync-state" data-phase={state.phase} data-setup={setup}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -155,11 +155,11 @@ export function SyncScreen({ initial, hasKey, shortcutName, renderedAt }: SyncSc
           </div>
         </StaggerItem>
 
-        <StaggerItem className="pt-6">
+        <StaggerItem className="pt-4">
           <div className="space-y-2">{view.actions}</div>
         </StaggerItem>
 
-        <StaggerItem className="pt-6">
+        <StaggerItem className="pt-4">
           <dl className="surface grid grid-cols-3 divide-x divide-hairline py-4">
             <Stat label="Days covered">
               <span data-testid="days-covered">{snapshot.days_covered}</span>

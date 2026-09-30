@@ -20,13 +20,16 @@ export type ToastOptions = {
   title: string;
   description?: string;
   tone?: ToastTone;
-  /** Auto-dismiss after ms. Default 3200. */
+  /** Auto-dismiss after ms. Default 3200; Infinity keeps it until tapped. */
   duration?: number;
+  /** Tapping the toast runs this (it dismisses either way). */
+  onSelect?: () => void;
 };
 
-type ToastItem = Required<Omit<ToastOptions, "description">> & {
+type ToastItem = Required<Omit<ToastOptions, "description" | "onSelect">> & {
   id: number;
   description?: string;
+  onSelect?: () => void;
 };
 
 type ToastApi = {
@@ -87,6 +90,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number) => void }) {
   useEffect(() => {
+    if (!Number.isFinite(item.duration)) return;
     const t = window.setTimeout(() => onDismiss(item.id), item.duration);
     return () => window.clearTimeout(t);
   }, [item.id, item.duration, onDismiss]);
@@ -107,7 +111,10 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
       onDragEnd={(_, info) => {
         if (info.offset.y < -24 || info.velocity.y < -300) onDismiss(item.id);
       }}
-      onClick={() => onDismiss(item.id)}
+      onClick={() => {
+        item.onSelect?.();
+        onDismiss(item.id);
+      }}
       className="surface surface-elevated pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl px-4 py-3"
     >
       <span

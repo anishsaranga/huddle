@@ -165,7 +165,7 @@ test.describe("admin", () => {
     await expect(page.getByTestId("ingest-event")).toHaveCount(25);
     await page.getByRole("radio", { name: "All", exact: true }).click();
     await expect(page).not.toHaveURL(/status=/);
-    // A made-up user id shows the 404 page (the status is already 200 once the loading state has streamed).
+    // A made-up user id shows the 404 page (with a real 404 status: see pwa.spec.ts).
     await page.goto("/admin/data/00000000-0000-4000-8000-000000000000");
     await expect(page.getByText("This page could not be found")).toBeVisible();
     await page.goto("/admin/data/not-a-uuid");
