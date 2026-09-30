@@ -22,7 +22,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/groups/[id]/
 
   const hub = await getChatHub();
   return openGroupStream(
-    { groupId: id, userId: user.id, lastEventId: parseLastEventId(request), signal: request.signal },
+    // The Request itself, not request.signal: the stream must keep it alive (see StreamParams.request).
+    { groupId: id, userId: user.id, lastEventId: parseLastEventId(request), request },
     { db, hub },
   );
 }

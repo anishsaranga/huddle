@@ -1,3 +1,5 @@
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, sql } from "@/db";
@@ -11,6 +13,19 @@ vi.mock("@/lib/session", () => ({ getCurrentUser: async () => session.user }));
 const { deleteMessage, listMessages, resetChatLimiters, sendMessage, toggleReaction, MESSAGE_RATE_LIMIT } = await import("@/lib/chat/service");
 const { groupChannel, notifyGroup } = await import("@/lib/chat/notify");
 const { getChatHub } = await import("@/lib/chat/hub");
+const { openGroupStream } = await import("@/lib/chat/stream");
+
+// A full GC on demand. Routes get a Request whose signal only follows the
+// caller's AbortController while that Request is alive (undici forwards the
+// abort through a WeakRef), so the stream tests collect garbage before
+// aborting: a stream that kept only `request.signal` would never hear it.
+setFlagsFromString("--expose-gc");
+const gc = runInNewContext("gc") as () => void;
+async function collectGarbage() {
+  gc();
+  await new Promise((r) => setImmediate(r)); // WeakRef targets are kept alive until the current job ends
+  gc();
+}
 const { GET: streamGET } = await import("@/app/api/groups/[id]/stream/route");
 const { GET: messagesGET } = await import("@/app/api/groups/[id]/messages/route");
 
@@ -286,9 +301,69 @@ describe("GET /api/groups/[id]/stream", () => {
     expect(text).toContain(`event: reaction\ndata: {"type":"reaction","id":${ids[1]}}\n\n`);
     expect(text).not.toContain("four"); // ids only
 
+    // The client goes away: released synchronously on abort, even though
+    // nothing but the stream holds on to the route's Request any more.
+    await collectGarbage();
     ctrl.abort();
-    await vi.waitFor(() => expect(hub.subscriberCount(groupId)).toBe(0));
-    await reader.cancel().catch(() => {});
+    expect(hub.subscriberCount(groupId)).toBe(0);
+    expect(await reader.read()).toEqual({ done: true, value: undefined });
+  });
+
+  it("releases the subscriber when the client leaves during LISTEN setup or the replay query", async () => {
+    const { ann, ben, groupId } = await setup();
+    const r = await sendMessage(db, { groupId, userId: ann.id, body: "x" });
+    if (!r.ok) throw new Error();
+    const hub = await getChatHub();
+    const open = (ctrl: AbortController | null, subscribe: typeof hub.subscribe = (...a) => hub.subscribe(...a)) =>
+      openGroupStream(
+        { groupId, userId: ben.id, lastEventId: 0, request: ctrl ? new Request("http://localhost/", { signal: ctrl.signal }) : undefined },
+        { db, hub: { subscribe } },
+      );
+
+    // Abort while LISTEN is pending: released at once, the pending subscribe
+    // rejects, and the stream ends after `retry`.
+    let subscribing: Promise<unknown> | undefined;
+    const ctrl1 = new AbortController();
+    const res1 = open(ctrl1, (...a) => (subscribing = hub.subscribe(...a)));
+    expect(hub.subscriberCount(groupId)).toBe(1);
+    ctrl1.abort();
+    expect(hub.subscriberCount(groupId)).toBe(0);
+    await expect(subscribing).rejects.toMatchObject({ name: "AbortError" });
+    expect(await res1.text()).toBe("retry: 3000\n\n");
+
+    // Same through the body's cancel (no request signal at all).
+    const res2 = open(null);
+    expect(hub.subscriberCount(groupId)).toBe(1);
+    await res2.body!.cancel();
+    expect(hub.subscriberCount(groupId)).toBe(0);
+
+    // Abort while the replay query runs: a table lock holds it until the
+    // client has gone; it then sends nothing more.
+    let unlock!: () => void;
+    const unlocked = new Promise<void>((ok) => (unlock = ok));
+    let locked!: () => void;
+    const isLocked = new Promise<void>((ok) => (locked = ok));
+    const tx = sql.begin(async (t) => {
+      await t`lock table messages in access exclusive mode`;
+      locked();
+      await unlocked;
+    });
+    await isLocked;
+    const ctrl3 = new AbortController();
+    const res3 = open(ctrl3);
+    await vi.waitFor(async () => {
+      const [row] = await sql<{ n: number }[]>`
+        select count(*)::int as n from pg_stat_activity
+        where datname = current_database() and wait_event_type = 'Lock' and query like '%from "messages"%'`;
+      expect(row.n).toBe(1);
+    });
+    expect(hub.subscriberCount(groupId)).toBe(1);
+    ctrl3.abort();
+    expect(hub.subscriberCount(groupId)).toBe(0);
+    unlock();
+    await tx;
+    expect(await res3.text()).toBe("retry: 3000\n\n");
+    expect(hub.subscriberCount(groupId)).toBe(0);
   });
 
   it("?after= works too, and without either there's no replay", async () => {
@@ -300,15 +375,19 @@ describe("GET /api/groups/[id]/stream", () => {
     const a = openStream(groupId, {}, `?after=${r.message.id - 1}`);
     const readerA = (await a.res).body!.getReader();
     expect(await readUntil(readerA, (t) => t.includes("event: ready"))).toContain(`id: ${r.message.id}\n`);
+    const hub = await getChatHub();
     a.ctrl.abort();
+    expect(hub.subscriberCount(groupId)).toBe(0);
+    expect(await readerA.read()).toEqual({ done: true, value: undefined });
 
     const b = openStream(groupId);
     const readerB = (await b.res).body!.getReader();
     const textB = await readUntil(readerB, (t) => t.includes("event: ready"));
     expect(textB).not.toContain("event: message");
-    b.ctrl.abort();
-    await readerA.cancel().catch(() => {});
-    await readerB.cancel().catch(() => {});
+    // The reader going away (ReadableStream cancel) releases it too.
+    expect(hub.subscriberCount(groupId)).toBe(1);
+    await readerB.cancel();
+    expect(hub.subscriberCount(groupId)).toBe(0);
   });
 });
 

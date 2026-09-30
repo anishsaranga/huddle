@@ -34,8 +34,14 @@ export class ChatHub {
    * Start receiving `groupId`'s events. Resolves once LISTEN is active (so a
    * caller can replay from the DB afterwards without a gap) with the
    * unsubscribe function. Rejects if LISTEN fails.
+   *
+   * With `signal`, the subscription is released as soon as it aborts, at any
+   * point: while LISTEN is still being set up (the promise then rejects with
+   * the abort reason) or any time after. Releasing is synchronous and
+   * idempotent, whether through the signal or the returned function.
    */
-  async subscribe(groupId: string, listener: GroupListener): Promise<() => void> {
+  async subscribe(groupId: string, listener: GroupListener, signal?: AbortSignal): Promise<() => void> {
+    signal?.throwIfAborted();
     const channel = groupChannel(groupId);
     let entry = this.groups.get(groupId);
     if (!entry) {
@@ -53,25 +59,30 @@ export class ChatHub {
     }
     entry.listeners.add(listener);
     const current = entry;
-    try {
-      await current.listen;
-    } catch (err) {
-      current.listeners.delete(listener);
-      throw err;
-    }
 
-    let done = false;
-    return () => {
-      if (done) return;
-      done = true;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      signal?.removeEventListener("abort", release);
       current.listeners.delete(listener);
       if (current.listeners.size === 0 && this.groups.get(groupId) === current) {
         this.groups.delete(groupId);
-        current.listen
-          .then((meta) => meta?.unlisten())
-          .catch(() => {});
+        // Still pending is fine: UNLISTEN runs once LISTEN has gone through.
+        current.listen.then((meta) => meta?.unlisten()).catch(() => {});
       }
     };
+    signal?.addEventListener("abort", release, { once: true });
+
+    try {
+      await current.listen;
+    } catch (err) {
+      release();
+      throw err;
+    }
+    // Aborted while LISTEN was pending: `release` already ran.
+    signal?.throwIfAborted();
+    return release;
   }
 
   /** Subscribers for a group in this process (tests / diagnostics). */
