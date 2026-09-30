@@ -4,7 +4,13 @@ import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { spring } from "@/lib/ui/motion";
 
-export type TopTab = { id: string; label: string; content: ReactNode };
+export type TopTab = {
+  id: string;
+  label: string;
+  content: ReactNode;
+  /** Small marker pinned to the label's top-right (e.g. an unread count); doesn't affect the underline. */
+  badge?: ReactNode;
+};
 
 type TopTabsProps = {
   tabs: TopTab[];
@@ -166,8 +172,10 @@ export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "", fill
                 ref={(el) => {
                   labelRefs.current[i] = el;
                 }}
+                className={tab.badge ? "relative" : undefined}
               >
                 {tab.label}
+                {tab.badge && <span className="absolute -top-2 left-full ml-0.5 normal-case tracking-normal">{tab.badge}</span>}
               </span>
             </button>
           );
