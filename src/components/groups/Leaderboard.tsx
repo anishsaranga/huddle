@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useFlairProps } from "@/components/champions/Flair";
 import { Notice } from "@/components/dashboard/bits";
 import { DateSwitcher } from "@/components/overview/DateSwitcher";
 import { Avatar } from "@/components/ui/Avatar";
@@ -78,12 +79,14 @@ function RankRow({
   const color = metricColor(metric, row.value);
   const ratio = leader > 0 ? Math.min(Math.max(row.value / leader, 0), 1) : 0;
   const decimals = metricDecimals(metric, period);
+  // A current weekly champion wears their trophy (this board's title first, if they hold it).
+  const flair = useFlairProps(row.userId, { prefer: metric, size: 15, edge: pinned ? "rgb(28 31 36)" : "var(--bg)" });
   return (
     <div
       className={`flex items-center gap-3 rounded-[14px] px-3 py-2.5 ${isYou && !pinned ? "bg-white/[0.045] shadow-[inset_0_0_0_1px_var(--hairline-strong)]" : ""}`}
     >
       <span className="num w-7 shrink-0 text-right font-mono text-[13px] font-semibold text-text-2">{rankText(row, rows)}</span>
-      <Avatar user={avatarUserOf(row)} size={40} ring={color} />
+      <Avatar user={avatarUserOf(row)} size={40} ring={flair.ring ?? color} badge={flair.badge} alt={flair.label ? `${fullName(row)}. ${flair.label}` : undefined} />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <p className="flex min-w-0 items-center gap-1.5 text-[15px] font-semibold leading-tight">

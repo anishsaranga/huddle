@@ -221,7 +221,7 @@ Huddle's own formulas, all pure and documented at the top of each file: `sleep.t
 
 ## Retention, export and account deletion
 
-- **Retention** (`src/lib/retention.ts`, `runRetention(db, now, opts?)`; the worker schedules it in a later task, it is not registered yet).
+- **Retention** (`src/lib/retention.ts`, `runRetention(db, now, opts?)`; the worker's `retention` job runs it nightly, see "Worker and weekly champions").
   Deletes, per user, `daily_metrics`, `hr_hourly`, `sleep_nights`, `sleep_segments` (by `wake_date`) and `daily_scores` rows whose local
   date is **on or before `today - 365`**, where *today* is the user's local date at `now` (`users.timezone`, UTC when missing/invalid).
   So `today - 365` is deleted and `today - 364` kept (tested at that boundary, and for Pacific/Kiritimati vs America/Los_Angeles at one
@@ -286,6 +286,41 @@ Huddle's own formulas, all pure and documented at the top of each file: `sleep.t
 - Live: `GET /api/groups/:id/stream` (SSE; members only, 404 otherwise). One shared LISTEN connection per process (postgres.js `sql.listen`, `lib/chat/hub.ts`) with an in-memory subscriber set per group. Format and replay rules in `lib/chat/stream.ts`: `retry: 3000`, heartbeat comment every 25 s, message events carry the message id as SSE id, `Last-Event-ID` or `?after=` replays newer message ids from the DB before live events (`reset` when > 200 were missed). Payloads are ids only; the client refetches (`?ids=`). `Cache-Control: no-transform` keeps Next's gzip (and proxies) from buffering it. A disconnect (request abort or body `cancel`) releases the hub subscription synchronously in any phase (LISTEN setup, replay, live); `openGroupStream` takes the `Request` itself and keeps it alive, because a Request's signal stops following the upstream abort once the Request is garbage collected (undici forwards through a WeakRef).
 - Client (`components/chat/*`): pure reducer in `store.ts` (dedupe by id, pending sends keep their React key), timeline grouping in `lib/chat/timeline.ts` (author groups break on a 5-minute gap; day separators in the viewer's timezone), `useGroupStream` (EventSource; closed while hidden, reopened with `?after=` on `visibilitychange` / `online`, resync of the newest page after a reconnect). The panel fills the space above the tab bar and scrolls inside; the composer is portaled `position: fixed` above the tab bar, or above the keyboard via `visualViewport`. Long-press / right-click opens `MessageMenu` (reactions, Copy, Delete). The Chat tab's unread badge comes from the last-read id in localStorage (`huddle:chat:lastRead:<user>:<group>`), reported through `ChatTabContext`.
 - Tests: `tests/unit/chat-*.test.ts`, `tests/integration/chat.test.ts` (service, NOTIFY payloads, the SSE route read as a stream), `tests/e2e/chat.spec.ts` (two sessions).
+
+## Worker and weekly champions
+
+- **Worker** (`npm run worker`; `src/worker/index.ts`): one process holds a Postgres advisory lock and schedules the jobs in
+  `src/worker/jobs/index.ts` with node-cron (server-local time). Each run writes `worker_heartbeats` (shown on `/admin/groups/[id]`).
+  Jobs get `ctx.now()` (injectable) and must use it for every date decision.
+  - `champions`, hourly at `:05`: for each group, once it is past **Monday 09:00 in the group's timezone**, last week's post
+    (Mon-Sun, group-local) is made unless it exists. Runs later in the week catch up (a worker that was down on Monday posts on its
+    next run); a week older than the last completed one is never posted automatically. One group's failure doesn't stop the others
+    (the run is then recorded as an error and retried next hour).
+  - `retention`, nightly at `03:17`: `runRetention(ctx.db, ctx.now())`, counts logged.
+- **Computation** (`src/lib/champions/compute.ts`, pure `computeChampions` + `loadChampionFacts`): members' own `local_date`s in the
+  group week, >= 4 days per category (like the week boards), deactivated members excluded. Categories: `recovery` / `sleep` (best
+  mean), `strain` (highest mean), `steps` (highest total over days with a count), `improved` (biggest positive gain in mean recovery
+  over the previous week; both weeks >= 4 days). Means compare at 1 decimal. **Ties**: one winner per category by a deterministic
+  tiebreak (value, then more days, then display name, then user id); the next two are runners-up. Categories nobody qualifies for are
+  left out, and there is no post when fewer than 2 members qualify.
+- **Text** (`src/lib/champions/generate.ts`): Gemini (`src/lib/ai/gemini.ts`, REST `generateContent`, key in the `x-goog-api-key`
+  header only, 10 s timeout, one retry on 429/5xx/network, fences stripped, capped at 600 characters) when `GEMINI_API_KEY` and
+  `GEMINI_MODEL` are set; the prompt holds only the facts (display names, categories, values, units, week label). Anything else, or
+  any failure, uses the deterministic template (`template.ts`, phrasing rotates by week). Logs carry provider, latency, attempts and
+  the fallback reason, never the key or the prompt.
+- **Posting** (`post.ts`, `postWeeklyChampions(db, groupId, weekStart, { now, generate })`): idempotent. An existing award row or
+  champions message for the week means "already posted"; otherwise one transaction (advisory lock per group and week) inserts the
+  `champions` message (`user_id` null, payload `{ v: 1, weekStart, weekLabel, categories: [{ category, winners, runnersUp }], source }`
+  with user ids and a name/avatar snapshot), one `champion_awards` row per category linked to it, and `notifyGroup`. Deleting an
+  account cascades its awards but keeps the post; `listMessages` adds `payload.deletedUserIds` so the card shows "Deleted user".
+- **UI**: `components/champions/ChampionsCard.tsx` (the chat card; rows open that week's board through `ChatTabContext.openBoard`)
+  and `Flair.tsx`. `getActiveFlair(db, userIds, groupId?, now)` (`flair.ts`, one query) returns the titles of the group's latest
+  champions week, shown until the next post and for at most two weeks after that week began; the group page provides it to Info rows
+  and the member sheet, non-podium leaderboard rows and chat avatars.
+- **Admin** (`/admin/groups/[id]`): last post, **Dry run** (last completed week's facts + text, nothing written), **Post now**
+  (confirmation; "Already posted" when it exists) and the worker job list. Server actions in `src/app/admin/actions.ts`.
+- Tests: `tests/unit/champions-*.test.ts`, `tests/integration/champions.test.ts`, `tests/e2e/champions.spec.ts` (the e2e server
+  runs with an empty `GEMINI_API_KEY`, so the template is used).
 
 ## Production
 

@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useOptimistic, useRef, useState, useTransition, type ReactNode } from "react";
-import { ChatTabContext } from "@/components/chat/ChatTabContext";
+import { useLayoutEffect, useMemo, useOptimistic, useRef, useState, useTransition, type ReactNode } from "react";
+import { FlairProvider } from "@/components/champions/Flair";
+import { ChatTabContext, type ChatTabBridge } from "@/components/chat/ChatTabContext";
 import { AmbientGlow } from "@/components/ui/AmbientGlow";
 import { TopTabs } from "@/components/ui/TopTabs";
 import { boardNav, groupQuery, type GroupPageState, type GroupTab } from "@/lib/groups/view";
+import type { FlairMap } from "@/lib/champions/flair";
 import { boardRange, type BoardPeriod } from "@/lib/scores/period";
 import type { GroupBoard, ScoreMetric } from "@/lib/scores/queries";
 import { NEUTRAL_SIGNAL, recoveryColorOrNeutral, SIGNAL } from "@/lib/ui/colors";
@@ -18,6 +20,8 @@ const TAB_LABELS: { id: GroupTab; label: string }[] = [
   { id: "recovery", label: "Recovery" },
   { id: "sleep", label: "Sleep" },
 ];
+
+const EMPTY_FLAIR: FlairMap = {};
 
 const isBoard = (t: GroupTab): t is ScoreMetric => t === "strain" || t === "recovery" || t === "sleep";
 
@@ -37,6 +41,8 @@ type GroupScreenProps = {
   chat: ReactNode;
   /** Ambient color behind the Info tab (the group's average recovery band). */
   infoGlow: string;
+  /** Current weekly champions (userId → titles): trophy flair on avatars. */
+  flair?: FlairMap;
 };
 
 /**
@@ -46,7 +52,7 @@ type GroupScreenProps = {
  * through router.replace in a transition, so the page stays mounted, the
  * controls update optimistically and the boards animate to the new values.
  */
-export function GroupScreen({ groupId, today, firstDate, viewerId, state, boards, header, info, chat, infoGlow }: GroupScreenProps) {
+export function GroupScreen({ groupId, today, firstDate, viewerId, state, boards, header, info, chat, infoGlow, flair }: GroupScreenProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [tab, setTab] = useState<GroupTab>(state.tab);
@@ -55,7 +61,13 @@ export function GroupScreen({ groupId, today, firstDate, viewerId, state, boards
   const [nav, setNav] = useOptimistic<{ period: BoardPeriod; date: string }>({ period: state.period, date: state.date });
   const [direction, setDirection] = useState(0);
   const [chatUnread, setChatUnread] = useState(0);
-  const chatBridge = useMemo(() => ({ active: tab === "chat", setUnread: setChatUnread }), [tab]);
+  const [jump, setJump] = useState<{ index: number; seq: number } | undefined>(undefined);
+  // Champions card rows open that week's board; the latest closure lives in a ref so the bridge stays stable.
+  const openBoardRef = useRef<(t: ScoreMetric, date: string) => void>(() => {});
+  const chatBridge = useMemo<ChatTabBridge>(
+    () => ({ active: tab === "chat", setUnread: setChatUnread, openBoard: (t, date) => openBoardRef.current(t, date) }),
+    [tab],
+  );
 
   const hrefFor = (t: GroupTab, period: BoardPeriod, date: string) =>
     `/groups/${groupId}${groupQuery({ tab: t, period, date }, today)}`;
@@ -75,6 +87,17 @@ export function GroupScreen({ groupId, today, firstDate, viewerId, state, boards
       router.replace(hrefFor(tabRef.current, period, date), { scroll: false });
     });
   };
+
+  useLayoutEffect(() => {
+    openBoardRef.current = (t, date) => {
+      tabRef.current = t; // so the period/date navigation below keeps this tab in the URL
+      if (nav.period !== "week" || boardRange("week", nav.date).from !== boardRange("week", date).from) {
+        go("week", date, date < nav.date ? -1 : 1);
+      }
+      // TopTabs animates over and reports back through onTab (URL + seen state).
+      setJump((j) => ({ index: TAB_LABELS.findIndex((x) => x.id === t), seq: (j?.seq ?? 0) + 1 }));
+    };
+  });
 
   const bnav = boardNav(nav.period, nav.date, today, firstDate);
   const currentWeek = nav.period === "week" && boardRange("week", nav.date).from === boardRange("week", today).from;
@@ -124,9 +147,11 @@ export function GroupScreen({ groupId, today, firstDate, viewerId, state, boards
     <div className="relative isolate">
       <AmbientGlow color={glow} intensity={0.75} />
       {header}
-      <ChatTabContext.Provider value={chatBridge}>
-        <TopTabs fill tabs={tabs} defaultIndex={TAB_LABELS.findIndex((t) => t.id === state.tab)} onChange={onTab} />
-      </ChatTabContext.Provider>
+      <FlairProvider flair={flair ?? EMPTY_FLAIR}>
+        <ChatTabContext.Provider value={chatBridge}>
+          <TopTabs fill tabs={tabs} defaultIndex={TAB_LABELS.findIndex((t) => t.id === state.tab)} onChange={onTab} jump={jump} />
+        </ChatTabContext.Provider>
+      </FlairProvider>
     </div>
   );
 }

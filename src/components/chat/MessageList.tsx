@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { memo } from "react";
+import { useFlairProps } from "@/components/champions/Flair";
 import { Avatar } from "@/components/ui/Avatar";
 import type { ChatAuthor } from "@/lib/chat/types";
 import { timeLabel, type TimelineItem } from "@/lib/chat/timeline";
@@ -81,7 +82,8 @@ function CardRow({ message, tz }: { message: TimelineMessage; tz: string }) {
     <motion.div
       data-message-id={message.id}
       className="py-2"
-      initial={message.fresh ? { opacity: 0, y: 16, scale: 0.98 } : false}
+      // The champions card plays its own entrance.
+      initial={message.fresh && message.kind !== "champions" ? { opacity: 0, y: 16, scale: 0.98 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={spring.soft}
     >
@@ -101,12 +103,17 @@ const MessageGroup = memo(function MessageGroup({ messages, viewerId, tz, ...han
   const last = messages[messages.length - 1];
   const mine = first.authorId === viewerId;
   const name = authorName(first.author);
+  const flair = useFlairProps(first.author?.id, { size: 13 });
 
   return (
     <div className={`flex gap-2 pt-2.5 ${mine ? "justify-end pl-10" : "pr-8"}`}>
       {!mine && (
         <div className="w-7 shrink-0 pt-[19px]">
-          {first.author ? <Avatar user={first.author} label={name} size="sm" /> : <DeletedUserAvatar />}
+          {first.author ? (
+            <Avatar user={first.author} label={name} size="sm" ring={flair.ring} badge={flair.badge} />
+          ) : (
+            <DeletedUserAvatar />
+          )}
         </div>
       )}
       <div className={`flex min-w-0 flex-1 flex-col ${mine ? "items-end" : "items-start"}`}>

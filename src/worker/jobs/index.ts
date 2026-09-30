@@ -1,5 +1,7 @@
 import { getEnv } from "@/lib/env";
 import type { JobDef } from "../registry";
+import { championsJob } from "./champions";
+import { retentionJob } from "./retention";
 
 /**
  * Jobs the worker schedules. Add new jobs here (one file per job under this
@@ -18,4 +20,8 @@ const exampleJob: JobDef = {
   },
 };
 
-export const jobs: JobDef[] = [...(getEnv().WORKER_EXAMPLE_JOB === "1" ? [exampleJob] : [])];
+export const jobs: JobDef[] = [
+  championsJob,
+  retentionJob,
+  ...(getEnv().WORKER_EXAMPLE_JOB === "1" ? [exampleJob] : []),
+];

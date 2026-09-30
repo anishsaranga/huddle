@@ -15,6 +15,7 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql, type SQL } from "drizzle-orm";
 import { messages, reactions, users } from "@/db/schema";
 import type { Db } from "@/lib/admin/db";
+import { markDeletedChampions } from "@/lib/champions/deleted";
 import { getMemberGroup } from "@/lib/groups/queries";
 import { childLogger } from "@/lib/log";
 import { SlidingWindowLimiter } from "@/lib/ratelimit";
@@ -129,9 +130,7 @@ async function loadMessages(db: Db, groupId: string, viewerId: string, opts: Lis
     viewerId,
   );
 
-  return {
-    hasMore,
-    messages: page.map((r) => ({
+  const list: ChatMessage[] = page.map((r) => ({
       id: r.id,
       kind: r.kind,
       body: r.deletedAt ? "" : r.body,
@@ -149,8 +148,9 @@ async function loadMessages(db: Db, groupId: string, viewerId: string, opts: Lis
           }
         : null,
       reactions: reactionsById.get(r.id) ?? [],
-    })),
-  };
+  }));
+  // Champions posts: flag winners whose account was deleted since (the payload keeps their ids).
+  return { hasMore, messages: await markDeletedChampions(db, list) };
 }
 
 /** Reactions per message, one entry per emoji in first-reaction order. One query. */

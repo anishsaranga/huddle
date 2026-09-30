@@ -16,6 +16,10 @@ import {
   updateGroup,
 } from "@/lib/admin/groups";
 import { deactivateUser, reactivateUser } from "@/lib/admin/users";
+import { dryRunChampions, type ChampionsDryRun } from "@/lib/champions/admin";
+import { getChampionGroup, lastCompletedWeek } from "@/lib/champions/compute";
+import { postWeeklyChampions } from "@/lib/champions/post";
+import { z } from "zod";
 
 /*
  * Admin mutations. Every action re-checks the admin (server actions are plain
@@ -183,5 +187,44 @@ export async function reactivateUserAction(userId: string): Promise<ActionResult
     if (!r.ok) return { ok: false, error: r.message };
     refreshAdmin();
     return { ok: true, message: "User reactivated" };
+  });
+}
+
+/* --------------------------- Weekly champions --------------------------- */
+
+const GROUP_GONE = "That group doesn't exist.";
+const isUuid = (v: unknown): v is string => z.uuid().safeParse(v).success;
+
+/** Compute last week's champions for a group and generate the text, without posting. */
+export async function championsDryRunAction(groupId: string): Promise<ActionResult<{ dry: ChampionsDryRun }>> {
+  return withAdmin("champions.dryRun", async (actor) => {
+    if (!isUuid(groupId)) return { ok: false, error: GROUP_GONE };
+    const dry = await dryRunChampions(db, groupId);
+    report(actor.id, "champions.dryRun", { ok: true }, {
+      targetId: groupId,
+      weekStart: dry.weekStart,
+      outcome: dry.ok ? dry.source : dry.reason,
+    });
+    if (!dry.ok && dry.reason === "no_group") return { ok: false, error: GROUP_GONE };
+    return { ok: true, dry };
+  });
+}
+
+/** Post last week's champions now (idempotent: "Already posted" when it exists). */
+export async function postChampionsNowAction(
+  groupId: string,
+): Promise<ActionResult<{ status: "posted" | "already_posted" }>> {
+  return withAdmin("champions.post", async (actor) => {
+    if (!isUuid(groupId)) return { ok: false, error: GROUP_GONE };
+    const group = await getChampionGroup(db, groupId);
+    if (!group) return { ok: false, error: GROUP_GONE };
+    const r = await postWeeklyChampions(db, groupId, lastCompletedWeek(group.timezone, new Date()));
+    report(actor.id, "champions.post", { ok: r.status !== "skipped" }, { targetId: groupId, weekStart: r.weekStart, status: r.status });
+    if (r.status === "skipped") return { ok: false, error: "Not enough data: fewer than 2 members have 4+ days last week." };
+    refreshAdmin();
+    revalidatePath(`/groups/${groupId}`);
+    return r.status === "posted"
+      ? { ok: true, status: "posted", message: "Champions posted to the group chat" }
+      : { ok: true, status: "already_posted", message: "Already posted for that week" };
   });
 }

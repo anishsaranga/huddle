@@ -7,7 +7,12 @@ import { createContext, useContext } from "react";
  * Chat tab is the one showing, and where the chat reports its unread count
  * (shown as a badge on the tab label).
  */
-export type ChatTabBridge = { active: boolean; setUnread: (n: number) => void };
+export type ChatTabBridge = {
+  active: boolean;
+  setUnread: (n: number) => void;
+  /** Switch to a leaderboard tab on the week containing `date` (champions card rows). Absent outside a group screen. */
+  openBoard?: (tab: "strain" | "recovery" | "sleep", date: string) => void;
+};
 
 const noop = () => {};
 

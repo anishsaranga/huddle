@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
+import { flairProps, useFlair, useFlairMap } from "@/components/champions/Flair";
 import { Dial } from "@/components/charts/Dial";
 import { TrendBars } from "@/components/charts/TrendBars";
 import { CardHead } from "@/components/dashboard/bits";
@@ -11,7 +12,8 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Stagger, StaggerItem } from "@/components/ui/Stagger";
 import type { GroupToday, TodayScores } from "@/lib/groups/view";
 import type { ScoreMetric } from "@/lib/scores/queries";
-import { recoveryColorOrNeutral } from "@/lib/ui/colors";
+import { CATEGORY_META } from "@/lib/champions/types";
+import { alpha, recoveryColorOrNeutral } from "@/lib/ui/colors";
 import { formatNumber } from "@/lib/ui/format";
 import { DIAL_STAGGER, PRESS_SCALE, spring } from "@/lib/ui/motion";
 import { avatarUserOf, firstName, fullName, METRIC, metricColor, metricDecimals } from "./metric";
@@ -64,6 +66,8 @@ function MiniScore({ metric, value }: { metric: ScoreMetric; value: number | nul
 }
 
 function MemberSheet({ member, open, onClose }: { member: MemberView | null; open: boolean; onClose: () => void }) {
+  const titles = useFlair(member?.userId);
+  const champ = flairProps(titles, { size: 24, edge: "var(--card-elevated)" });
   return (
     <Sheet open={open && member !== null} onClose={onClose} title={member ? fullName(member) : undefined}>
       {member && (
@@ -72,7 +76,8 @@ function MemberSheet({ member, open, onClose }: { member: MemberView | null; ope
             <Avatar
               user={avatarUserOf(member)}
               size="xl"
-              ring={member.scores.recovery !== null ? recoveryColorOrNeutral(member.scores.recovery) : undefined}
+              ring={champ.ring ?? (member.scores.recovery !== null ? recoveryColorOrNeutral(member.scores.recovery) : undefined)}
+              badge={champ.badge}
             />
             <div className="min-w-0 space-y-1.5">
               {member.username && <p className="truncate text-[15px] text-text-2">@{member.username}</p>}
@@ -85,6 +90,19 @@ function MemberSheet({ member, open, onClose }: { member: MemberView | null; ope
                 />
                 {member.lastSynced ? `SYNCED ${member.lastSynced.toUpperCase()}` : "NEVER SYNCED"}
               </p>
+              {titles.length > 0 && (
+                <p className="flex flex-wrap gap-1.5 pt-0.5">
+                  {titles.map((c) => (
+                    <span
+                      key={c}
+                      className="telemetry rounded-full px-2 py-[3px] text-[8.5px] tracking-[0.12em]"
+                      style={{ color: CATEGORY_META[c].color, background: alpha(CATEGORY_META[c].color, 12), boxShadow: `inset 0 0 0 1px ${alpha(CATEGORY_META[c].color, 35)}` }}
+                    >
+                      {CATEGORY_META[c].title}
+                    </span>
+                  ))}
+                </p>
+              )}
             </div>
           </div>
           <div className="mt-7 flex items-center justify-between">
@@ -114,6 +132,7 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId, dateConte
   // The last opened member stays set while the sheet animates out.
   const [selected, setSelected] = useState<MemberView | null>(null);
   const [open, setOpen] = useState(false);
+  const flair = useFlairMap();
   const avgScores: TodayScores = { recovery: today.recovery.value, strain: today.strain.value, sleep: today.sleep.value };
   const footers = Object.fromEntries(
     ORDER.map((m) => [m, today[m].n > 0 ? `${today[m].n} OF ${today.total}` : "NO DATA"]),
@@ -189,6 +208,7 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId, dateConte
           <ul>
             {members.map((m) => {
               const band = m.scores.recovery !== null ? recoveryColorOrNeutral(m.scores.recovery) : undefined;
+              const champ = flairProps(flair[m.userId] ?? [], { size: 15, edge: "var(--card)" });
               return (
                 <li key={m.userId}>
                   <motion.button
@@ -200,9 +220,9 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId, dateConte
                     whileTap={{ scale: PRESS_SCALE }}
                     transition={spring.press}
                     className={`flex w-full items-center gap-2.5 rounded-[14px] px-3 py-2.5 text-left active:bg-white/[0.03] ${m.userId === viewerId ? "bg-white/[0.035]" : ""}`}
-                    aria-label={`${fullName(m)}. Today: recovery ${m.scores.recovery ?? "none"}, strain ${m.scores.strain ?? "none"}, sleep ${m.scores.sleep ?? "none"}. ${m.lastSynced ? `Synced ${m.lastSynced}` : "Never synced"}`}
+                    aria-label={`${fullName(m)}. ${champ.label ? `${champ.label}. ` : ""}Today: recovery ${m.scores.recovery ?? "none"}, strain ${m.scores.strain ?? "none"}, sleep ${m.scores.sleep ?? "none"}. ${m.lastSynced ? `Synced ${m.lastSynced}` : "Never synced"}`}
                   >
-                    <Avatar user={avatarUserOf(m)} size={36} ring={band} />
+                    <Avatar user={avatarUserOf(m)} size={36} ring={champ.ring ?? band} badge={champ.badge} />
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 text-[15px] font-semibold leading-tight">
                         <span className="truncate">{fullName(m)}</span>

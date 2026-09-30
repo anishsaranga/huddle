@@ -19,6 +19,8 @@ type TopTabsProps = {
   className?: string;
   /** Tabs share the strip's width (tighter padding) instead of scrolling; for a handful of short labels. */
   fill?: boolean;
+  /** Programmatic switch: each new `seq` animates to `index` (and calls onChange). */
+  jump?: { index: number; seq: number };
 };
 
 /** Letter-spacing leaves trailing space after the last glyph; trim it off the underline. */
@@ -33,7 +35,7 @@ const TRAILING_TRACK = 1.5;
  * leave the track between panels. The underline is linked to the track's x:
  * it interpolates position and width between labels while dragging.
  */
-export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "", fill = false }: TopTabsProps) {
+export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "", fill = false, jump }: TopTabsProps) {
   const baseId = useId();
   const reduced = useReducedMotion();
   const stripRef = useRef<HTMLDivElement>(null);
@@ -131,6 +133,16 @@ export function TopTabs({ tabs, defaultIndex = 0, onChange, className = "", fill
       onChange?.(next);
     }
   };
+
+  const goRef = useRef(go);
+  useLayoutEffect(() => {
+    goRef.current = go;
+  });
+  const jumpSeq = jump?.seq;
+  const jumpIndex = jump?.index;
+  useEffect(() => {
+    if (jumpSeq !== undefined && jumpIndex !== undefined) goRef.current(jumpIndex);
+  }, [jumpSeq, jumpIndex]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;

@@ -37,6 +37,8 @@ export default defineConfig({
       // Deterministic "Google not configured" behavior regardless of .env.
       AUTH_GOOGLE_ID: "",
       AUTH_GOOGLE_SECRET: "",
+      // Weekly champions text always comes from the template (no network calls to Gemini).
+      GEMINI_API_KEY: "",
       LOG_LEVEL: "warn",
     },
   },

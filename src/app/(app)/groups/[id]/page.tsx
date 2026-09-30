@@ -7,6 +7,7 @@ import { InfoPanel } from "@/components/groups/InfoPanel";
 import { avatarUserOf, fullName } from "@/components/groups/metric";
 import type { GroupTrendBar, MemberView } from "@/components/groups/types";
 import { dateLabel, shortDate, weekdayShort } from "@/lib/dashboard/dates";
+import { getActiveFlair } from "@/lib/champions/flair";
 import { listMessages } from "@/lib/chat/service";
 import { memberGroup } from "@/lib/groups/access";
 import { getGroupFirstScoreDate, getGroupRecoveryTrend, getMembersToday, groupDateOf } from "@/lib/groups/queries";
@@ -40,9 +41,13 @@ export default async function GroupPage({ params, searchParams }: PageProps<"/gr
   // Chat times and day separators use the viewer's own timezone.
   const chatTz = user.timezone || group.timezone || "UTC";
   const state = parseGroupState(sp, today, firstDate);
-  const boards = await getGroupBoards(db, group.id, state.period, state.date);
-
   const members = membersByGroup.get(group.id) ?? [];
+  const [boards, flair] = await Promise.all([
+    getGroupBoards(db, group.id, state.period, state.date),
+    // Trophy flair for the group's current weekly champions (Info rows, boards, chat avatars).
+    getActiveFlair(db, members.map((m) => m.userId), group.id, now),
+  ]);
+
   const summary = groupToday(members);
   const memberViews: MemberView[] = members.map((m) => ({
     userId: m.userId,
@@ -75,6 +80,7 @@ export default async function GroupPage({ params, searchParams }: PageProps<"/gr
       state={state}
       boards={boards}
       infoGlow={recoveryColorOrNeutral(summary.recovery.value)}
+      flair={flair}
       header={
         <GroupHeader
           name={group.name}
