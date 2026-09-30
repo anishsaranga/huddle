@@ -1,10 +1,9 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(auth)/actions";
 import { KeySection } from "@/components/apikey/KeySection";
 import { SubmitButton } from "@/components/auth/SubmitButton";
+import { DeleteAccountRow, ExportRow } from "@/components/profile/AccountRows";
 import { ProfileView } from "@/components/profile/ProfileView";
-import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { db } from "@/db";
 import { getKeyStatus } from "@/lib/apikey";
@@ -31,14 +30,13 @@ const chevron = (
   </svg>
 );
 
-function RowBody({ label, hint, badge }: { label: string; hint: string; badge?: ReactNode }) {
+function RowBody({ label, hint }: { label: string; hint: string }) {
   return (
     <>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-medium leading-tight text-text">{label}</span>
         <span className="mt-1 block text-[13px] leading-snug text-muted">{hint}</span>
       </span>
-      {badge}
     </>
   );
 }
@@ -52,17 +50,10 @@ function LinkRow({ href, label, hint }: { href: string; label: string; hint: str
   );
 }
 
-/** Placeholder row for a feature that ships in a later milestone. */
-function SoonRow({ label, hint }: { label: string; hint: string }) {
-  return (
-    <div aria-disabled="true" className="flex min-h-[64px] items-center gap-3 px-5 py-3 opacity-55">
-      <RowBody label={label} hint={hint} badge={<Badge>Soon</Badge>} />
-    </div>
-  );
-}
-
-export default async function ProfilePage() {
+export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ export?: string | string[] }> }) {
   const user = await requireOnboardedUser();
+  const { export: exportParam } = await searchParams;
+  const exportLimited = (Array.isArray(exportParam) ? exportParam[0] : exportParam) === "limited";
   const [key, ingestUrl] = await Promise.all([getKeyStatus(db, user.id), getIngestUrl()]);
 
   return (
@@ -92,9 +83,14 @@ export default async function ProfilePage() {
       <Card padding="p-0" className="divide-y divide-hairline overflow-hidden">
         <LinkRow href="/setup" label="Sync setup" hint="Connect your iPhone Shortcut" />
         <LinkRow href="/credits" label="Avatar credits" hint="Artists behind the characters" />
-        <SoonRow label="Export my data" hint="Download everything as JSON" />
-        <SoonRow label="Delete account" hint="Remove your account and data" />
+        <ExportRow />
+        <DeleteAccountRow username={user.username} isAdmin={user.isAdmin} />
       </Card>
+      {exportLimited && (
+        <p role="status" className="px-1 text-[13px] leading-snug text-muted">
+          You can export up to 5 times an hour. Try again a bit later.
+        </p>
+      )}
 
       <form action={signOutAction} className="pt-3">
         <SubmitButton variant="secondary" fullWidth>

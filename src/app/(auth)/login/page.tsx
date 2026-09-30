@@ -21,12 +21,13 @@ function errorCopy(code: string | undefined): string | null {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; deleted?: string | string[] }>;
 }) {
   if (await getCurrentUser()) redirect("/home");
 
-  const { error } = await searchParams;
+  const { error, deleted } = await searchParams;
   const message = errorCopy(Array.isArray(error) ? error[0] : error);
+  const wasDeleted = (Array.isArray(deleted) ? deleted[0] : deleted) === "1";
 
   return (
     <>
@@ -75,6 +76,16 @@ export default async function LoginPage({
         </div>
 
         <StaggerItem className="pb-6">
+          {wasDeleted && (
+            <p
+              role="status"
+              data-testid="account-deleted"
+              className="surface mb-4 px-4 py-3 text-[14px] leading-snug text-text-2"
+              style={{ boxShadow: `inset 3px 0 0 ${SIGNAL.green}` }}
+            >
+              Your account and data were deleted.
+            </p>
+          )}
           {message && (
             <p
               role="alert"

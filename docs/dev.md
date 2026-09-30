@@ -218,3 +218,37 @@ Huddle's own formulas, all pure and documented at the top of each file: `sleep.t
 - Membership is checked in `groups/[id]/layout.tsx` (outside the page's loading boundary, so non-members and unknown ids get a real 404 status) and again in the page (`memberGroup`, React-`cache`d). The list's skeleton lives in `groups/(list)/` so it doesn't wrap `[id]`.
 - URL state: `?tab=info|chat|strain|recovery|sleep&period=day|week&date=YYYY-MM-DD` (defaults omitted; the default date is the group date). Tab changes use `history.replaceState` (no server round trip); period/date changes use `router.replace(…, { scroll: false })` in a transition with optimistic controls, so the page stays mounted and values count from the previous board.
 - UI: `src/components/groups/*` (`GroupScreen` shell with `TopTabs fill`, `InfoPanel` + member sheet, `Leaderboard` with `Podium`, rows and the pinned "YOUR RANK" bar, `ChatPlaceholder` = the chat slot T7.1 replaces).
+
+## Retention, export and account deletion
+
+- **Retention** (`src/lib/retention.ts`, `runRetention(db, now, opts?)`; the worker schedules it in a later task, it is not registered yet).
+  Deletes, per user, `daily_metrics`, `hr_hourly`, `sleep_nights`, `sleep_segments` (by `wake_date`) and `daily_scores` rows whose local
+  date is **on or before `today - 365`**, where *today* is the user's local date at `now` (`users.timezone`, UTC when missing/invalid).
+  So `today - 365` is deleted and `today - 364` kept (tested at that boundary, and for Pacific/Kiritimati vs America/Los_Angeles at one
+  UTC instant). One set-based `DELETE ... USING users` per table; the per-timezone cutoffs come from a small `VALUES` list with one row
+  per distinct timezone, so there is no per-user loop. It also deletes `ingest_events` with `received_at` older than
+  `INGEST_LOG_RETENTION_DAYS` (default 90) and orphaned avatar files: files in `AVATAR_DIR` named `<uuid>-<12 hex>.webp` (or its
+  `.<pid>.tmp` leftover) that no `users.avatar_path` references and that are older than 1 hour. Any other file name is never touched.
+  Returns per-table counts and logs them (`module: retention`).
+- **Export** (`GET /api/me/export`, `src/lib/account/export.ts`): session auth only, 5 per hour per user (in-memory limiter, like ingest;
+  a link tap over the limit is redirected to `/profile?export=limited`, other clients get 429). The body is one JSON document built
+  incrementally as a `ReadableStream`: each section is read with a database cursor in batches (`ingest_events` 10 rows at a time because
+  of the bodies, the rest 100 to 1000), so memory stays flat and a cancelled download stops querying. Shape: `exported_at`,
+  `format_version` (1), `profile`, `api_keys` (id, prefix_hint, created/revoked/last_used; never a hash), `groups`, `daily_metrics`,
+  `hr_hourly`, `sleep_nights`, `sleep_segments`, `daily_scores`, `ingest_events` (summary + body + errors), `messages`, `reactions`,
+  `champion_awards` (own rows only). Column names are the database's snake_case names; dates are `YYYY-MM-DD`, timestamps ISO strings.
+  Not included: Auth.js accounts/sessions/tokens, key hashes, the avatar image file. A failure mid-stream errors the response instead of
+  ending a truncated file that looks complete.
+- **Export on iOS**: the Profile row is a plain `<a href="/api/me/export">` (not `next/link`, so nothing prefetches it and burns the rate
+  limit). A navigation to a `Content-Disposition: attachment` response is what makes Safari, including the standalone home-screen app,
+  show its download sheet. Don't switch it to `fetch` + blob.
+- **Delete account** (`deleteAccountAction` in `src/lib/account/actions.ts` -> `deleteAccount` in `delete.ts`): the Profile sheet lists
+  the consequences and asks the user to type their username (case-insensitive, `@` optional). In one transaction it revokes the user's
+  keys, removes their allowlist entry and deletes the `users` row. Every user-owned table references `users(id)` with `ON DELETE CASCADE`
+  (`tests/integration/delete-account.test.ts` checks all foreign keys, and every table with a `user_id` column, so a new table can't be
+  forgotten); the two `SET NULL` references are `messages.user_id` (their chat messages stay, with no author: the UI shows "Deleted
+  user" for a `text` message without a user) and `allowed_emails.added_by`. After the commit the uploaded avatar file is removed (the
+  retention orphan sweep would catch a leftover). Then `signOut` redirects to `/login?deleted=1`, which shows "Your account and data were
+  deleted." The admin (`ADMIN_EMAIL` or `is_admin`) is refused; the Profile row is disabled for them. Logs carry the user id only.
+- **Perf assertion**: the 366-day backfill test in `tests/integration/ingest.test.ts` fails above 10 s by default (so it doesn't flake under
+  parallel load); set `PERF_STRICT=1` for the real 3 s budget on an idle machine.

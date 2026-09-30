@@ -197,7 +197,7 @@ test("profile: editing the display name persists", async ({ page }) => {
   await expect(page.getByText("15 Jun 1990")).toBeVisible();
 });
 
-test("profile: sections, links and placeholder rows", async ({ page }) => {
+test("profile: sections, links and account rows", async ({ page }) => {
   await loginAs(page, `e2e-links-${stamp()}@example.com`);
   await page.goto("/profile");
   for (const name of ["Edit personal", "Edit body", "Edit goals", "Edit preferences", "Edit avatar"]) {
