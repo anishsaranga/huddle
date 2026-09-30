@@ -29,6 +29,13 @@
       "when": 1790677304196,
       "tag": "0003_health_data_api_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790729684958,
+      "tag": "0004_chat_champions_worker",
+      "breakpoints": true
     }
   ]
 }

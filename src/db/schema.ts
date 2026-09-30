@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   bigserial,
   boolean,
   check,
@@ -341,3 +342,99 @@ export const ingestEvents = pgTable(
 );
 
 export type IngestEvent = typeof ingestEvents.$inferSelect;
+
+/* ------------------------------------------------------------------------ */
+/* Chat, champions and the worker                                            */
+/* ------------------------------------------------------------------------ */
+
+export type MessageKind = "text" | "champions" | "system";
+export type ChampionCategory = "sleep" | "recovery" | "strain" | "steps" | "improved";
+
+/**
+ * Group chat. `user_id` is null for system / champion posts and for authors
+ * who were deleted (set null). Soft-deleted rows keep their id (`deleted_at`).
+ */
+export const messages = pgTable(
+  "messages",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    kind: text("kind").$type<MessageKind>().notNull(),
+    body: text("body").notNull().default(""),
+    payload: jsonb("payload").$type<Record<string, unknown>>(),
+    createdAt: tstz("created_at").notNull().defaultNow(),
+    editedAt: tstz("edited_at"),
+    deletedAt: tstz("deleted_at"),
+  },
+  (t) => [
+    index("messages_group_id_id_idx").on(t.groupId, t.id.desc()),
+    check("messages_kind", sql`${t.kind} in ('text', 'champions', 'system')`),
+  ],
+);
+
+export type Message = typeof messages.$inferSelect;
+
+export const reactions = pgTable(
+  "reactions",
+  {
+    messageId: bigint("message_id", { mode: "number" })
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: tstz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.messageId, t.userId, t.emoji] }),
+    check("reactions_emoji_length", sql`char_length(${t.emoji}) between 1 and 16`),
+  ],
+);
+
+export type Reaction = typeof reactions.$inferSelect;
+
+/** One winner per group, week and category. `week_start` is the group-local Monday. */
+export const championAwards = pgTable(
+  "champion_awards",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    category: text("category").$type<ChampionCategory>().notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    value: real("value"),
+    messageId: bigint("message_id", { mode: "number" }).references(() => messages.id, {
+      onDelete: "set null",
+    }),
+    createdAt: tstz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("champion_awards_group_week_category_idx").on(t.groupId, t.weekStart, t.category),
+    index("champion_awards_user_week_idx").on(t.userId, t.weekStart),
+    check(
+      "champion_awards_category",
+      sql`${t.category} in ('sleep', 'recovery', 'strain', 'steps', 'improved')`,
+    ),
+  ],
+);
+
+export type ChampionAward = typeof championAwards.$inferSelect;
+
+/** One row per background job (see src/worker/registry.ts). */
+export const workerHeartbeats = pgTable("worker_heartbeats", {
+  job: text("job").primaryKey(),
+  lastRunAt: tstz("last_run_at"),
+  lastOkAt: tstz("last_ok_at"),
+  lastError: text("last_error"),
+  info: jsonb("info").$type<Record<string, unknown>>(),
+});
+
+export type WorkerHeartbeat = typeof workerHeartbeats.$inferSelect;

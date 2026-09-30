@@ -8,8 +8,11 @@ export const TEST_DATABASE_URL =
 
 export function assertTestDatabase(url: string): void {
   const name = new URL(url).pathname.replace(/^\//, "");
-  if (!name.endsWith("_test")) {
-    throw new Error(`Refusing to use database "${name}" for tests: its name must end in _test.`);
+  // huddle_test, or a parallel slot such as huddle_test_w0b.
+  if (!/_test(_[a-z0-9]+)?$/.test(name)) {
+    throw new Error(
+      `Refusing to use database "${name}" for tests: its name must end in _test or _test_<slot>.`,
+    );
   }
 }
 

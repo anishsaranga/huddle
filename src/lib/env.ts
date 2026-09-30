@@ -25,6 +25,8 @@ const schema = z.object({
   ),
   /** Uploaded avatar photos. Default ./data/avatars (dev) or /data/avatars (production). */
   AVATAR_DIR: optional(z.string()),
+  /** Set to 1 to schedule the no-op example job in the worker (src/worker/jobs/index.ts). */
+  WORKER_EXAMPLE_JOB: optional(z.string()),
   INGEST_LOG_RETENTION_DAYS: withDefault(z.coerce.number().int().positive(), 90),
   NODE_ENV: withDefault(z.enum(["development", "production", "test"]), "development"),
 });
