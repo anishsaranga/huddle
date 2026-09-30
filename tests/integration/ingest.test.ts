@@ -513,7 +513,8 @@ describe("upsert", () => {
     const rejected = await post({ days: tooMany }, { key });
     expect(rejected.status).toBe(400);
     expect((await rejected.json()).issues[0].message).toMatch(/at most 366 days/);
-  });
+    // Whole test (two big requests + score recompute) needs headroom beyond the 5 s default under load.
+  }, 30_000);
 });
 
 /* ------------------------------------------------------------------ */

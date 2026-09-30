@@ -22,6 +22,8 @@ export default defineConfig({
           globalSetup: ["tests/integration/global-setup.ts"],
           setupFiles: ["tests/integration/setup.ts"],
           fileParallelism: false,
+          // Real DB work slows down a lot when several checkouts test at once.
+          testTimeout: 20_000,
         },
       },
     ],
