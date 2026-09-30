@@ -41,7 +41,7 @@ function ScoreDials({ scores, footers, delay = 0 }: { scores: TodayScores; foote
               delay={delay + i * DIAL_STAGGER}
               ariaLabel={`${METRIC[m].label}: ${hollow ? "no data" : `${formatNumber(v, metricDecimals(m))}${METRIC[m].unit}`}`}
               footer={
-                footers?.[m] ? <span className="telemetry -mt-1 text-[9px]!">{footers[m]}</span> : undefined
+                footers?.[m] ? <span className="telemetry -mt-1 text-[9px]">{footers[m]}</span> : undefined
               }
             />
           </div>
@@ -180,7 +180,7 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId, dateConte
             <CardHead title="Members" meta={<span>{members.length}</span>} className="mb-2" />
             <div className="flex justify-end gap-0.5 pb-1 pr-3" aria-hidden>
               {ORDER.map((m) => (
-                <span key={m} className="telemetry w-[38px] text-right text-[8px]! tracking-[0.05em]!">
+                <span key={m} className="telemetry w-[38px] text-right text-[8px] tracking-[0.05em]">
                   {SHORT[m]}
                 </span>
               ))}
@@ -207,12 +207,12 @@ export function InfoPanel({ members, today, trend, trendAvg, viewerId, dateConte
                       <p className="flex items-center gap-1.5 text-[15px] font-semibold leading-tight">
                         <span className="truncate">{fullName(m)}</span>
                         {m.userId === viewerId && (
-                          <span className="telemetry shrink-0 rounded-full bg-white/[0.08] px-1.5 py-[2px] text-[8px]! leading-none! text-text!">
+                          <span className="telemetry shrink-0 rounded-full bg-white/[0.08] px-1.5 py-[2px] text-[8px] leading-none text-text">
                             YOU
                           </span>
                         )}
                       </p>
-                      <p className="telemetry mt-1 flex min-w-0 items-center gap-1 text-[9.5px]!">
+                      <p className="telemetry mt-1 flex min-w-0 items-center gap-1 text-[9.5px]">
                         {m.username && <span className="min-w-0 truncate">@{m.username}</span>}
                         {m.username && <span aria-hidden className="shrink-0">·</span>}
                         <span className={`shrink-0 ${m.hasData ? "text-text-2" : ""}`}>

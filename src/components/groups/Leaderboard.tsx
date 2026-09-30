@@ -49,7 +49,7 @@ function rankText(row: BoardRow, rows: BoardRow[]): string {
 
 function YouChip() {
   return (
-    <span className="telemetry shrink-0 rounded-full bg-white/[0.08] px-1.5 py-[2px] text-[8.5px]! leading-none! tracking-[0.14em]! text-text! shadow-[inset_0_0_0_1px_var(--hairline-strong)]">
+    <span className="telemetry shrink-0 rounded-full bg-white/[0.08] px-1.5 py-[2px] text-[8.5px] leading-none tracking-[0.14em] text-text shadow-[inset_0_0_0_1px_var(--hairline-strong)]">
       YOU
     </span>
   );
@@ -109,7 +109,7 @@ function RankRow({
             transition={{ type: "spring", visualDuration: 0.8, bounce: 0.08 }}
           />
         </div>
-        <p className="telemetry mt-1.5 truncate text-[9.5px]!">
+        <p className="telemetry mt-1.5 truncate text-[9.5px]">
           {row.username ? `@${row.username}` : ""}
           {period === "week" && (
             <>
@@ -142,7 +142,7 @@ function PinnedYou({ show, children }: { show: boolean; children: React.ReactNod
           data-testid="pinned-you"
         >
           <div className="surface surface-elevated pointer-events-auto rounded-[18px] bg-[rgba(28,31,36,0.92)] p-1 shadow-[0_18px_40px_-12px_rgb(0_0_0/0.9)] backdrop-blur-xl">
-            <p className="telemetry absolute -top-2 left-5 rounded-full bg-card-elevated px-1.5 text-[8.5px]! tracking-[0.18em]! text-text-2!">
+            <p className="telemetry absolute -top-2 left-5 rounded-full bg-card-elevated px-1.5 text-[8.5px] tracking-[0.18em] text-text-2">
               YOUR RANK
             </p>
             {children}
@@ -248,7 +248,7 @@ export function Leaderboard({
                   <button
                     type="button"
                     onClick={() => onDate(nav.prev!, -1)}
-                    className="telemetry mx-auto block rounded-full px-4 py-2.5 text-text-2! shadow-[inset_0_0_0_1px_var(--hairline-strong)] transition-transform active:scale-95"
+                    className="telemetry mx-auto block rounded-full px-4 py-2.5 text-text-2 shadow-[inset_0_0_0_1px_var(--hairline-strong)] transition-transform active:scale-95"
                   >
                     See last week ›
                   </button>
@@ -288,7 +288,7 @@ export function Leaderboard({
               <section className="mt-6" aria-label="Not enough data">
                 <div className="mb-2 flex items-center justify-between px-3">
                   <h3 className="label">Not enough data</h3>
-                  <span className="telemetry text-[9.5px]!">NEEDS {WEEK_MIN_DAYS} OF 7 DAYS</span>
+                  <span className="telemetry text-[9.5px]">NEEDS {WEEK_MIN_DAYS} OF 7 DAYS</span>
                 </div>
                 <ul className="space-y-1 opacity-60">
                   {board.insufficient.map((m) => (

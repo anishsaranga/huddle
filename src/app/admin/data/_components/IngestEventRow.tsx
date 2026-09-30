@@ -207,7 +207,7 @@ function Expanded({ row }: { row: IngestLogRow }) {
               <p className="telemetry mb-1.5">Unknown fields</p>
               <div className="flex flex-wrap gap-1.5">
                 {unknown.map((u) => (
-                  <Badge key={u} tone="admin" className="!normal-case !tracking-normal">
+                  <Badge key={u} tone="admin" className="normal-case tracking-normal">
                     {u}
                   </Badge>
                 ))}

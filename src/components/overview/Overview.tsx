@@ -61,7 +61,7 @@ function ScoreDial({ d, label, max, format, href, delay }: DialSpec) {
 
   let footer: ReactNode = null;
   if (hollow && d.reason) {
-    footer = <span className="telemetry block max-w-[112px] text-balance text-center text-[9px] leading-[1.35] text-dim">{d.reason}</span>;
+    footer = <span className="telemetry block max-w-[112px] text-balance text-center">{d.reason}</span>;
   } else if (d.limited) {
     footer = <Chip>LIMITED</Chip>;
   } else if (d.live) {

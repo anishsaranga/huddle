@@ -40,7 +40,7 @@ export function GroupCard({ id, name, timezone, memberCount, people, today, dela
       </div>
       <div className="mt-3 flex items-center gap-3">
         <AvatarStack people={people.slice(0, 4)} total={memberCount} size="sm" />
-        <div className="telemetry min-w-0 leading-[1.45]!">
+        <div className="telemetry min-w-0 leading-[1.45]">
           <p className="truncate">
             <span className="text-text-2">{memberCount}</span> {memberCount === 1 ? "MEMBER" : "MEMBERS"}
           </p>
@@ -67,7 +67,7 @@ export function GroupCard({ id, name, timezone, memberCount, people, today, dela
                   delay={delay + i * 0.08}
                   ariaLabel={`Group ${METRIC[m].noun} today: ${hollow ? "no data" : `${formatNumber(a.value!, metricDecimals(m))}${METRIC[m].unit}`}`}
                 />
-                <span className="telemetry text-[8.5px]!">{SHORT[m]}</span>
+                <span className="telemetry text-[8.5px]">{SHORT[m]}</span>
               </div>
             );
           })}
@@ -77,7 +77,7 @@ export function GroupCard({ id, name, timezone, memberCount, people, today, dela
             {today.synced}
             <span className="text-[16px] text-muted"> / {today.total}</span>
           </p>
-          <p className="telemetry mt-1.5 text-[9px]!">SYNCED TODAY</p>
+          <p className="telemetry mt-1.5 text-[9px]">SYNCED TODAY</p>
           <div className="mt-2 flex justify-end gap-[3px]" aria-hidden>
             {Array.from({ length: Math.min(today.total, 12) }, (_, i) => (
               <span

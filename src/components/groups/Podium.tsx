@@ -169,7 +169,7 @@ export function Podium({ rows, metric, period, viewerId, play, youRef }: PodiumP
                       />
                       <p className="mt-2.5 flex max-w-full items-center gap-1 px-1 text-[13px] font-semibold leading-tight">
                         <span className="truncate">{firstName(row)}</span>
-                        {isYou && <span className="telemetry shrink-0 text-[8.5px]! text-text-2!">· YOU</span>}
+                        {isYou && <span className="telemetry shrink-0 text-[8.5px] text-text-2">· YOU</span>}
                       </p>
                     </motion.div>
                   ) : (
@@ -181,7 +181,7 @@ export function Podium({ rows, metric, period, viewerId, play, youRef }: PodiumP
                       >
                         —
                       </span>
-                      <p className="telemetry mt-3 text-dim!">OPEN</p>
+                      <p className="telemetry mt-3 text-dim">OPEN</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -203,7 +203,7 @@ export function Podium({ rows, metric, period, viewerId, play, youRef }: PodiumP
                     <span className="num">—</span>
                   )}
                 </p>
-                {period === "week" && row && <p className="telemetry mt-1 text-[9px]!">{row.days}/7 DAYS</p>}
+                {period === "week" && row && <p className="telemetry mt-1 text-[9px]">{row.days}/7 DAYS</p>}
               </motion.div>
 
               {/* Plinth */}
