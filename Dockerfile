@@ -19,6 +19,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# Prerendered pages (/offline, OG/Twitter images, metadataBase) bake in APP_URL at build time.
+ARG APP_URL=https://huddle.anishsaranga.com
+ENV APP_URL=$APP_URL
 # No DATABASE_URL (or any secret) is needed at build time: src/lib/env.ts parses
 # lazily and src/db/index.ts connects on first use, so `next build` never touches Postgres.
 RUN npm run build && npm run build:extras

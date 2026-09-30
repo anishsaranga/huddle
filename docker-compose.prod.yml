@@ -20,6 +20,8 @@ x-app: &app
   build:
     context: .
     dockerfile: Dockerfile
+    args:
+      APP_URL: ${APP_URL:-https://huddle.anishsaranga.com}
   image: huddle-prod:latest
   env_file:
     - .env.production
