@@ -50,8 +50,8 @@ const CameraBadge = () => (
   </svg>
 );
 
-/** Profile header + editable section cards + edit sheets. `children` render below the cards (server-rendered rows). */
-export function ProfileView({ user, children }: { user: ProfileData; children?: ReactNode }) {
+/** Profile header + editable section cards + edit sheets. `top` renders as the first StaggerItem; `children` render below the cards (server-rendered rows). */
+export function ProfileView({ user, children, top }: { user: ProfileData; children?: ReactNode; top?: ReactNode }) {
   const [open, setOpen] = useState<SheetKind | null>(null);
   const close = useCallback(() => setOpen(null), []);
   const units = user.units ?? "metric";
@@ -97,6 +97,7 @@ export function ProfileView({ user, children }: { user: ProfileData; children?: 
       </header>
 
       <Stagger className="space-y-3 px-4" delay={0.05}>
+        {top && <StaggerItem>{top}</StaggerItem>}
         <StaggerItem>
           <SectionCard title="Personal" kicker="// Identity" onEdit={() => setOpen("personal")}>
             <Row label="Name" value={name} />

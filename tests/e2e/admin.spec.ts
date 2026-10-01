@@ -47,6 +47,23 @@ test.describe("admin", () => {
     await loginAs(page, E2E_ADMIN_EMAIL, { name: "Admin E2E" });
   });
 
+  test("Admin card appears at the top of Profile, before Personal card", async ({ page }) => {
+    await page.goto("/profile");
+    // Verify the Admin card is visible and has the right link
+    const adminLink = page.locator("a[href='/admin'][aria-label='Admin']");
+    await expect(adminLink).toBeVisible();
+    // Verify "Personal" card is also visible
+    await expect(page.getByRole("button", { name: "Edit personal" })).toBeVisible();
+    // Check DOM order: Admin card link should come before the Personal edit button
+    const adminPosition = await page.locator("a[href='/admin'][aria-label='Admin']").first().evaluate((el) => {
+      const personalBtn = document.querySelector("button[aria-label='Edit personal']");
+      if (!personalBtn) throw new Error("Personal edit button not found");
+      return el.compareDocumentPosition(personalBtn);
+    });
+    // compareDocumentPosition: 4 = DOCUMENT_POSITION_FOLLOWING (first node comes before second node)
+    expect(adminPosition).toBe(4);
+  });
+
   test("Profile links to the admin area, which lands on the allowlist", async ({ page }) => {
     await page.goto("/profile");
     await page.locator("a[href='/admin']").click();

@@ -56,20 +56,20 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const exportLimited = (Array.isArray(exportParam) ? exportParam[0] : exportParam) === "limited";
   const [key, ingestUrl] = await Promise.all([getKeyStatus(db, user.id), getIngestUrl()]);
 
-  return (
-    <ProfileView user={toProfileData(user)}>
-      {user.isAdmin && (
-        <Card variant="interactive" href="/admin" chevron ariaLabel="Admin">
-          <p className="telemetry mb-2" style={{ color: "var(--strain)" }}>
-            Admin
-          </p>
-          <p className="font-display text-[26px] font-semibold uppercase leading-none tracking-[0.02em]">
-            Manage Huddle
-          </p>
-          <p className="mt-2 text-[14px] leading-snug text-muted">Allowlist, groups and users.</p>
-        </Card>
-      )}
+  const adminCard = user.isAdmin ? (
+    <Card variant="interactive" href="/admin" chevron ariaLabel="Admin">
+      <p className="telemetry mb-2" style={{ color: "var(--strain)" }}>
+        Admin
+      </p>
+      <p className="font-display text-[26px] font-semibold uppercase leading-none tracking-[0.02em]">
+        Manage Huddle
+      </p>
+      <p className="mt-2 text-[14px] leading-snug text-muted">Allowlist, groups and users.</p>
+    </Card>
+  ) : null;
 
+  return (
+    <ProfileView user={toProfileData(user)} top={adminCard}>
       <KeySection
         initial={{
           active: key.active,
