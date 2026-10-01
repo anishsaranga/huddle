@@ -241,7 +241,7 @@ export function OnboardingFlow({ initial, connectKeySlot }: { initial: Onboardin
     );
 
   return (
-    <div className="relative isolate flex h-dvh flex-col overflow-hidden">
+    <div className="relative isolate flex h-app flex-col overflow-hidden">
       <AmbientGlow color={GLOW[step]} intensity={isLast ? 0.9 : 0.7} />
 
       <header className="pt-safe px-safe">

@@ -39,8 +39,12 @@ type GroupChatProps = {
 
 const NEAR_BOTTOM_PX = 96;
 const LOAD_OLDER_PX = 480;
-/** Server-render estimate of the panel height (header + tab strip + tab bar); measured on mount. */
-const FALLBACK_HEIGHT = "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 195px)";
+/**
+ * Server-render estimate of the panel height (header + tab strip + tab bar); measured on mount.
+ * The app shell is 100dvh + --vh-gap tall (h-app), so the estimate adds the gap too.
+ */
+const FALLBACK_HEIGHT =
+  "calc(100dvh + var(--vh-gap, 0px) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 195px)";
 
 async function fetchPage(groupId: string, query: string): Promise<ChatPage | null> {
   try {
@@ -170,6 +174,8 @@ export function GroupChat({ groupId, groupName, viewer, tz, today: serverToday, 
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!panel || !metrics) return;
+    // metrics.bottom is the composer's resolved `bottom` (already minus --vh-gap), relative to the
+    // same layout viewport innerHeight describes, so no separate gap term here.
     const composerTop = window.innerHeight - metrics.bottom - metrics.height;
     const overlap = panel.getBoundingClientRect().bottom - composerTop;
     setPadBottom(Math.max(16, Math.round(overlap + 12)));

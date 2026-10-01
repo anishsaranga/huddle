@@ -232,7 +232,7 @@ export function PhotoCropper({ file, onCancel, onConfirm, onPickAnother }: Photo
         role="dialog"
         aria-modal="true"
         aria-label="Adjust photo"
-        className="fixed inset-0 z-[65] flex flex-col bg-bg"
+        className="fixed inset-x-0 top-0 bottom-app z-[65] flex flex-col bg-bg"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: ease.out }}

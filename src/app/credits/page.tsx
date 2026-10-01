@@ -27,7 +27,7 @@ function ExtLink({ href, children }: { href: string; children: React.ReactNode }
  */
 export default function CreditsPage() {
   return (
-    <main className="pt-safe pb-safe px-safe mx-auto min-h-dvh max-w-md">
+    <main className="pt-safe pb-safe px-safe mx-auto min-h-app max-w-md">
       <header className="px-5 pb-6 pt-10">
         <p className="telemetry mb-2">Huddle · licenses</p>
         <h1 className="font-display text-[44px] font-bold uppercase leading-[0.9] tracking-[0.02em]">Credits</h1>

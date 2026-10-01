@@ -63,7 +63,7 @@ export function Sheet({ open, onClose, title, children, className = "" }: SheetP
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[60]">
+        <div className="fixed inset-x-0 top-0 bottom-app z-[60]">
           <motion.div
             aria-hidden
             className="absolute inset-0 bg-black/60"

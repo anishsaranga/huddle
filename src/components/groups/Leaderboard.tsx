@@ -137,7 +137,8 @@ function PinnedYou({ show, children }: { show: boolean; children: React.ReactNod
       {show && (
         <motion.div
           className="pointer-events-none fixed inset-x-0 z-40 mx-auto max-w-md px-3"
-          style={{ bottom: "calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px)" }}
+          // 10px above the tab bar, which sits at bottom: -var(--vh-gap) (bottom-app).
+          style={{ bottom: "calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px - var(--vh-gap, 0px))" }}
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 28 }}

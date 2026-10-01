@@ -120,7 +120,7 @@ export function Showcase() {
   const strainBars = strainTrend.slice(-7).map((v, i) => ({ label: trendLabels[i + 7], value: v }));
 
   return (
-    <div className="relative isolate min-h-dvh overflow-x-clip">
+    <div className="relative isolate min-h-app overflow-x-clip">
       <AmbientGlow color={bandColor} />
       <div
         key={replay}

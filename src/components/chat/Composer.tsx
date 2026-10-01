@@ -122,7 +122,14 @@ export function Composer({ visible, placeholder, onSend, onMetrics }: ComposerPr
           ref={boxRef}
           key="composer"
           className="px-safe fixed inset-x-0 z-40"
-          style={{ bottom: inset > 0 ? inset : "calc(var(--tabbar-h) + env(safe-area-inset-bottom))" }}
+          // Keyboard closed: right on top of the tab bar, which sits at bottom: -var(--vh-gap)
+          // (see bottom-app in globals.css), so subtract the gap too. Keyboard open: `inset`
+          // is measured against the layout viewport (innerHeight vs visualViewport), the same
+          // box this fixed element's `bottom` resolves against, so it already lands on the
+          // keyboard's top edge and subtracting the gap would tuck the bar under the keyboard.
+          style={{
+            bottom: inset > 0 ? inset : "calc(var(--tabbar-h) + env(safe-area-inset-bottom) - var(--vh-gap, 0px))",
+          }}
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24, transition: { duration: 0.16 } }}

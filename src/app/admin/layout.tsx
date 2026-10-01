@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireAdmin();
 
   return (
-    <div className="pb-safe px-safe mx-auto min-h-dvh w-full max-w-xl">
+    <div className="pb-safe px-safe mx-auto min-h-app w-full max-w-xl">
       <div className="nav-chrome pt-safe sticky top-0 z-40 border-b border-hairline bg-[rgba(10,11,13,0.9)] backdrop-blur-xl backdrop-saturate-150">
         <div className="flex items-center justify-between px-4 pt-2">
           <Link

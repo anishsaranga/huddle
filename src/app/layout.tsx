@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import { startupImages } from "@/lib/pwa/splash";
+import { VIEWPORT_GAP_SCRIPT } from "@/lib/pwa/viewport-gap";
 import { metadataBase, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import "./globals.css";
 
@@ -74,8 +75,14 @@ export default function RootLayout({
     <html
       lang="en"
       className={`dark ${hanken.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable}`}
+      // The head script below may set --vh-gap in <html>'s style attribute before hydration.
+      suppressHydrationWarning
     >
-      <body className="min-h-dvh antialiased">
+      <head>
+        {/* Before first paint: measure the iOS 26 standalone viewport shortfall (src/lib/pwa/viewport-gap.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: VIEWPORT_GAP_SCRIPT }} />
+      </head>
+      <body className="min-h-app antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

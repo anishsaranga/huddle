@@ -97,7 +97,7 @@ function MenuOverlay({ target, onClose, onReact, onCopy, onDelete }: MessageMenu
   const origin = mine ? "100% 100%" : "0% 100%";
 
   return (
-    <div className="fixed inset-0 z-[65]" role="dialog" aria-modal="true" aria-label="Message actions">
+    <div className="fixed inset-x-0 top-0 bottom-app z-[65]" role="dialog" aria-modal="true" aria-label="Message actions">
       <motion.div
         aria-hidden
         className="absolute inset-0 bg-black/65"

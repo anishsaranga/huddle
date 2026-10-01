@@ -75,7 +75,8 @@
 html,
 body {
   background: var(--bg);
-  min-height: 100dvh;
+  /* + --vh-gap: see the full-viewport utilities below. */
+  min-height: calc(100dvh + var(--vh-gap, 0px));
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
@@ -210,6 +211,22 @@ button {
 @utility px-safe {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+
+/* Full-viewport sizing. iOS 26 standalone makes 100dvh and the fixed-position
+   containing block ~safe-area-inset-bottom shorter than the screen; the root
+   layout's head script measures that as --vh-gap (src/lib/pwa/viewport-gap.ts).
+   It's unset everywhere else, so these are plain 100dvh / bottom: 0. Fixed
+   bottom chrome and full-screen overlays use bottom-app so they reach the
+   physical bottom edge (pair it with inset-x-0 top-0, not inset-0). */
+@utility h-app {
+  height: calc(100dvh + var(--vh-gap, 0px));
+}
+@utility min-h-app {
+  min-height: calc(100dvh + var(--vh-gap, 0px));
+}
+@utility bottom-app {
+  bottom: calc(0px - var(--vh-gap, 0px));
 }
 
 /* Inner scroll container: no rubber-band chaining to the page */

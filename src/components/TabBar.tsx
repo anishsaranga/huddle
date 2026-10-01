@@ -77,7 +77,7 @@ export function TabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="nav-chrome pb-safe px-safe fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-[rgba(10,11,13,0.92)] backdrop-blur-xl backdrop-saturate-150"
+      className="nav-chrome pb-safe px-safe fixed inset-x-0 bottom-app z-50 border-t border-hairline bg-[rgba(10,11,13,0.92)] backdrop-blur-xl backdrop-saturate-150"
     >
       <ul className="mx-auto flex max-w-md items-stretch" style={{ height: "var(--tabbar-h)" }}>
         {tabs.map((tab) => {

@@ -52,7 +52,7 @@ export function AmbientGlow({
           />
         </motion.div>
       </AnimatePresence>
-      {grain && <div className="grain fixed inset-0 opacity-[0.04]" />}
+      {grain && <div className="grain fixed inset-x-0 top-0 bottom-app opacity-[0.04]" />}
     </div>
   );
 }
