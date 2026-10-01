@@ -219,6 +219,32 @@ On the iPhone, in Safari:
    attempt should be a success. From the host: `docker logs huddle-prod-web`.
 5. Profile > Export data downloads a JSON file (the iOS download sheet).
 
+## 7a. Publishing the Shortcut
+
+Friends install the Huddle Sync Shortcut from `/setup` Option A. iOS only imports
+**signed** Shortcut files, so build it once on your iPhone and export it from there:
+
+1. Build it from `/setup` Option B. Then open the Shortcut's details (ⓘ) >
+   **Import Questions** and add a question for each of the `HuddleURL` and
+   `HuddleKey` Text actions, so each friend is asked for their own URL and key.
+2. **iCloud link:** Share > **Copy iCloud Link**, then set `SHORTCUT_ICLOUD_URL` in
+   `.env.production`.
+3. **File download:** Share > **Options** > **File**, audience **Anyone**, save to
+   Files, and copy it to `public/shortcuts/huddle-sync.shortcut` in the repo
+   checkout on the server (it is not committed to git).
+4. Rebuild and redeploy (both are only read at startup / build):
+
+   ```powershell
+   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+   ```
+
+Do one or both: `/setup` shows a "Get Huddle Sync" button for the link and a
+"Download .shortcut file" button for the file. **Verify the file holds no
+secrets:** as long as the URL and key Text actions are Import Questions their
+values are blanked on export. Open the shared link or file on another device and
+confirm it asks for both and does not already contain your key. The file is
+served without sign-in at `/shortcuts/huddle-sync.shortcut`.
+
 ## 8. Updating
 
 ```powershell

@@ -35,6 +35,17 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
         ],
       },
+      {
+        // The exported iOS Shortcut (public/shortcuts/): force a download instead of letting Safari try to
+        // render it, and always revalidate so a re-exported file is never stale. These merge with the
+        // baseline security headers above (different keys).
+        source: "/shortcuts/:file*",
+        headers: [
+          { key: "Content-Type", value: "application/octet-stream" },
+          { key: "Content-Disposition", value: 'attachment; filename="Huddle Sync.shortcut"' },
+          { key: "Cache-Control", value: "no-cache" },
+        ],
+      },
     ];
   },
 };

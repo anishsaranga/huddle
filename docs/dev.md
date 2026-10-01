@@ -145,7 +145,7 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
 - `/setup` (`components/setup/*`): hero with progress (installed = any recorded ingest attempt, Health = data arrived, automated =
   successful syncs on 2+ days this week), a live status strip (polls sync-status every 10 s; red banner when the last attempt
   failed), the URL and key card ("Show a new key" regenerates and reveals once; the key then also appears inline in the recipe),
-  Option A (`SHORTCUT_ICLOUD_URL`) / Option B (the whole Huddle Sync recipe as a checklist with a device picker; per-device metric
+  Option A (`SHORTCUT_ICLOUD_URL` and/or `public/shortcuts/huddle-sync.shortcut`, see "Publishing the Shortcut") / Option B (the whole Huddle Sync recipe as a checklist with a device picker; per-device metric
   support lives in `src/lib/sync/recipe.ts`, checked against `fields.ts` by `tests/unit/sync-recipe.test.ts`), Health access,
   automation, backfill and troubleshooting. Step progress and the device pick are kept in localStorage.
 - `/sync` (`components/sync/*`): the orb plus "Sync now". The tap opens
@@ -156,6 +156,19 @@ change looks like a rename; in non-TTY shells split it into a drop migration and
   sessionStorage, so a PWA that iOS reloads on return picks it up.
 - E2E hooks: `window.__huddleSync = { openUrl, pollMs, timeoutMs, stayedMs }` (set with `page.addInitScript`) captures the
   `shortcuts://` navigation and shortens the timers; see `tests/e2e/sync.spec.ts`.
+
+## Publishing the Shortcut (Option A on `/setup`)
+
+iOS only imports **signed** `.shortcut` files, so the admin builds it once on their iPhone and exports it from there. Both install paths are optional and independent; `/setup` shows whichever exist (iCloud button first, file download second, "Install link not published yet" if neither).
+
+1. Build it from `/setup` Option B. Then open the Shortcut's details (ⓘ) → **Import Questions** and add a question for each of the `HuddleURL` and `HuddleKey` Text actions, so every friend is asked for their own URL and key on install.
+2. **iCloud link:** Share → **Copy iCloud Link**, set `SHORTCUT_ICLOUD_URL` in the server's `.env.production`.
+3. **File download:** Share → **Options** → **File** (not "Shortcut"), set the audience to **Anyone**, save to Files, copy it to `public/shortcuts/huddle-sync.shortcut` in the repo checkout on the server. The file is not committed (`public/shortcuts/.gitkeep` only keeps the folder).
+4. Rebuild: `docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build`. The file's presence is checked once per process (`src/lib/setup/shortcut-file.ts`, relative to `process.cwd()`, which is `/app` in the image where `public/` is copied), so a redeploy is needed to pick it up.
+
+The file is served by Next from `public/` at `/shortcuts/huddle-sync.shortcut`; `next.config.ts` adds `Content-Type: application/octet-stream`, `Content-Disposition: attachment; filename="Huddle Sync.shortcut"` and `Cache-Control: no-cache` (merged with the baseline security headers), the service worker never caches `/shortcuts/*`, and the proxy matcher skips it (it has an extension), so it is downloadable without signing in.
+
+**Check before publishing:** the file must contain no secrets. As long as the URL and key Text actions are Import Questions their values are blanked on export; open the exported Shortcut (or the shared link) on a second device and confirm it asks for both and does not already contain your key.
 
 ## Ingest (`POST /api/ingest`)
 

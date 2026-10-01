@@ -104,7 +104,10 @@ test.describe("/setup", () => {
     await page.reload();
     await expect(page.getByTestId("key-hint")).toHaveText(`${first.slice(0, 8)}••••`);
     await expect(page.getByTestId("api-key-value")).toHaveCount(0);
-    await expect(page.getByTestId("icloud-missing")).toBeVisible(); // SHORTCUT_ICLOUD_URL is unset in e2e
+    // SHORTCUT_ICLOUD_URL is unset in e2e and public/shortcuts/huddle-sync.shortcut is not committed: neither install path exists.
+    await expect(page.getByTestId("icloud-missing")).toContainText("Install link not published yet");
+    await expect(page.getByTestId("shortcut-download")).toHaveCount(0);
+    await expect(page.getByTestId("icloud-install")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Show a new key" }).click();
     await expect(page.getByRole("heading", { name: "Show a new key?" })).toBeVisible();

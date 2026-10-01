@@ -33,6 +33,11 @@ describe("service worker route classification", () => {
     }
   });
 
+  it("never touches the downloadable Shortcut file, even as a navigation", () => {
+    expect(kind("/shortcuts/huddle-sync.shortcut")).toBe("bypass");
+    expect(kind("/shortcuts/huddle-sync.shortcut", { mode: "navigate" })).toBe("bypass");
+  });
+
   it("ignores non-GET requests and other origins", () => {
     expect(kind("/home", { method: "POST", mode: "navigate" })).toBe("bypass");
     expect(kind("/_next/static/chunks/a.js", { method: "POST" })).toBe("bypass");

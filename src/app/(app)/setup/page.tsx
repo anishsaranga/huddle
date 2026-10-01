@@ -4,6 +4,7 @@ import { getKeyStatus } from "@/lib/apikey";
 import { getIngestUrl } from "@/lib/app-url";
 import { getEnv } from "@/lib/env";
 import { requireOnboardedUser } from "@/lib/session";
+import { getShortcutFileUrl } from "@/lib/setup/shortcut-file";
 import { getRecentSyncDays, getSyncStatus } from "@/lib/sync-status";
 
 export const metadata = { title: "Sync setup" };
@@ -32,6 +33,7 @@ export default async function SetupPage() {
       automated={syncDays >= 2}
       shortcutName={env.SHORTCUT_NAME}
       icloudUrl={env.SHORTCUT_ICLOUD_URL ?? null}
+      shortcutFileUrl={getShortcutFileUrl()}
       renderedAt={Date.parse(status.server_time)}
     />
   );

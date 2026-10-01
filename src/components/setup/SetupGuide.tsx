@@ -11,7 +11,8 @@ import { alpha, SIGNAL } from "@/lib/ui/colors";
 import { formatRelative } from "@/lib/ui/format";
 import { spring } from "@/lib/ui/motion";
 import { ConnectionCard } from "./ConnectionCard";
-import { Act, Collapsible, CopyChip, F, L, Rail, SectionTitle, Tip, Toggle, V } from "./primitives";
+import { InstallOption } from "./InstallOption";
+import { Act, Collapsible, CopyChip, F, Kbd, L, NumberedList, Rail, SectionTitle, Tip, Toggle, V } from "./primitives";
 import { Recipe } from "./Recipe";
 
 type SetupGuideProps = {
@@ -22,6 +23,8 @@ type SetupGuideProps = {
   automated: boolean;
   shortcutName: string;
   icloudUrl: string | null;
+  /** Public path of the downloadable .shortcut file, when the admin has put one on the server. */
+  shortcutFileUrl: string | null;
   renderedAt: number;
 };
 
@@ -155,21 +158,6 @@ function LiveStrip({ status, now }: { status: SyncStatusResponse; now: number })
   );
 }
 
-function NumberedList({ items }: { items: ReactNode[] }) {
-  return (
-    <ol className="space-y-3">
-      {items.map((item, i) => (
-        <li key={i} className="flex gap-3">
-          <span className="num mt-[1px] grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.06] font-mono text-[11px] text-text-2 shadow-[inset_0_0_0_1px_var(--hairline-strong)]">
-            {i + 1}
-          </span>
-          <span className="min-w-0 flex-1 text-[14.5px] leading-relaxed text-text-2">{item}</span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 function Trouble({ title, children, defaultOpen, id }: { title: string; children: ReactNode; defaultOpen?: boolean; id?: string }) {
   return (
     <Collapsible
@@ -183,14 +171,12 @@ function Trouble({ title, children, defaultOpen, id }: { title: string; children
   );
 }
 
-const Kbd = ({ children }: { children: ReactNode }) => <span className="text-text-2">{children}</span>;
-
 /**
  * /setup: connect the iPhone. Hero with live progress, the user's URL and key,
- * Option A (iCloud install link) / Option B (build it yourself, step by step),
+ * Option A (iCloud link and/or .shortcut download) / Option B (build it yourself, step by step),
  * automation, backfill and troubleshooting.
  */
-export function SetupGuide({ ingestUrl, keyStatus, initialStatus, automated, shortcutName, icloudUrl, renderedAt }: SetupGuideProps) {
+export function SetupGuide({ ingestUrl, keyStatus, initialStatus, automated, shortcutName, icloudUrl, shortcutFileUrl, renderedAt }: SetupGuideProps) {
   const status = useLiveStatus(initialStatus);
   const [keyState, setKeyState] = useState(keyStatus);
   const [revealed, setRevealed] = useState<string | null>(null);
@@ -260,58 +246,7 @@ export function SetupGuide({ ingestUrl, keyStatus, initialStatus, automated, sho
         {/* Option A */}
         <StaggerItem as="section" id="install" className="scroll-mt-4">
           <SectionTitle kicker="// Option A · Recommended" title="Install in one tap" color={SIGNAL.strain} />
-          {icloudUrl ? (
-            <div className="surface surface-elevated p-5">
-              <motion.a
-                href={icloudUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                whileTap={{ scale: 0.97 }}
-                transition={spring.press}
-                data-testid="icloud-install"
-                className="flex h-[56px] w-full items-center justify-center gap-2.5 rounded-full text-[14px] font-semibold uppercase tracking-[0.12em] text-bg"
-                style={{ background: SIGNAL.strain, boxShadow: `0 0 0 1px ${alpha(SIGNAL.strain, 60)} inset, 0 10px 30px -10px ${alpha(SIGNAL.strain, 80)}` }}
-              >
-                <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" />
-                </svg>
-                Get {shortcutName}
-              </motion.a>
-              <div className="mt-5">
-                <NumberedList
-                  items={[
-                    <>
-                      Tap <Kbd>Get {shortcutName}</Kbd>, then <Kbd>Add Shortcut</Kbd>. Keep its name.
-                    </>,
-                    <>
-                      When it asks, paste your URL <CopyChip value={ingestUrl} label="Ingest URL" /> and your key
-                      {revealed ? (
-                        <>
-                          {" "}
-                          <CopyChip value={revealed} label="Key" />
-                        </>
-                      ) : (
-                        <> from the card above (use Show a new key to get a copyable one)</>
-                      )}
-                    </>,
-                    <>Run it once from the Shortcuts app and allow Health access.</>,
-                  ]}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="surface p-5" data-testid="icloud-missing">
-              <p className="telemetry" style={{ color: SIGNAL.yellow }}>
-                {"// Link not published yet"}
-              </p>
-              <p className="mt-2 text-[15px] leading-relaxed text-text-2">
-                Your Huddle admin hasn&rsquo;t shared the one-tap install link yet.
-              </p>
-              <p className="mt-1.5 text-[14px] leading-relaxed text-muted">
-                Build it yourself below: about 15 minutes, once. Or ask your admin for the link.
-              </p>
-            </div>
-          )}
+          <InstallOption shortcutName={shortcutName} icloudUrl={icloudUrl} shortcutFileUrl={shortcutFileUrl} ingestUrl={ingestUrl} revealed={revealed} />
         </StaggerItem>
 
         {/* Option B */}

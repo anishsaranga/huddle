@@ -29,6 +29,8 @@ function classify(url, request, origin) {
   if (url.origin !== origin) return "bypass";
   const p = url.pathname;
   if (p === "/api" || p.startsWith("/api/")) return "bypass";
+  // The downloadable iOS Shortcut: straight to the network, so a re-exported file is never stale.
+  if (p.startsWith("/shortcuts/")) return "bypass";
   if (request.mode === "navigate") return "navigate";
   if (p.startsWith("/_next/static/") || p.startsWith("/icons/")) return "static";
   if (request.destination === "font") return "static";

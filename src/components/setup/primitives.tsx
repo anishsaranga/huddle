@@ -227,3 +227,22 @@ export function SectionTitle({ kicker, title, children, color }: { kicker: strin
     </div>
   );
 }
+
+/** Inline label for a tappable control or menu path. */
+export const Kbd = ({ children }: { children: ReactNode }) => <span className="text-text-2">{children}</span>;
+
+/** A numbered list of steps. */
+export function NumberedList({ items }: { items: ReactNode[] }) {
+  return (
+    <ol className="space-y-3">
+      {items.map((item, i) => (
+        <li key={i} className="flex gap-3">
+          <span className="num mt-[1px] grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.06] font-mono text-[11px] text-text-2 shadow-[inset_0_0_0_1px_var(--hairline-strong)]">
+            {i + 1}
+          </span>
+          <span className="min-w-0 flex-1 text-[14.5px] leading-relaxed text-text-2">{item}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}

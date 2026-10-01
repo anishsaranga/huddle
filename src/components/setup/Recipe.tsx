@@ -7,7 +7,7 @@ import type { DeviceId } from "@/lib/sync/recipe";
 import { alpha, SIGNAL } from "@/lib/ui/colors";
 import { ease, spring } from "@/lib/ui/motion";
 import { AdviceBadge, DevicePicker, extraAdvice, MetricTable } from "./DevicePicker";
-import { Act, Chevron, CopyChip, F, L, Rail, Tip, Toggle, V } from "./primitives";
+import { Act, Chevron, CopyChip, F, Kbd, L, Rail, Tip, Toggle, V } from "./primitives";
 
 type RecipeProps = {
   ingestUrl: string;
@@ -199,6 +199,11 @@ function buildSteps({ ingestUrl, apiKey, keyHint, shortcutName, device }: Recipe
           <Tip>
             In the iCloud version these two are Import Questions: it asks for them when you add it. After a new key, only
             the HuddleKey text changes.
+          </Tip>
+          <Tip>
+            Admin, before sharing: open the Shortcut&rsquo;s details (ⓘ) → <Kbd>Import Questions</Kbd> and add a question for each of
+            the <V>HuddleURL</V> and <V>HuddleKey</V> Text actions, so every friend is asked for their own URL and key when they
+            install it.
           </Tip>
         </>
       ),
